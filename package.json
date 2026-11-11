@@ -9,7 +9,8 @@
     "preview": "astro preview",
     "check": "astro check",
     "verify": "node scripts/verify-dist.mjs",
-    "dev:pages": "npm run build && wrangler pages dev dist --port 8788 --compatibility-date 2025-01-01",
+    "dev:worker": "npm run build && wrangler dev --port 8787",
+    "deploy": "npm run build && wrangler deploy",
     "mock:resend": "node scripts/mock-resend.mjs"
   },
   "dependencies": {

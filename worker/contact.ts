@@ -1,10 +1,10 @@
 /**
- * Cloudflare Pages Function: POST /api/contact
+ * Cloudflare Worker handler: POST /api/contact (routed from worker/index.ts)
  *
  * Validates the contact form, then asks Resend to email it to GEPER.
  * Success is only reported when Resend accepts the message and returns an id.
  *
- * Environment (Cloudflare Pages → Settings → Variables and Secrets):
+ * Environment (Worker → Settings → Variables and Secrets; locally .dev.vars):
  *   RESEND_API_KEY  (secret, required)
  *   CONTACT_TO      (optional, default mailgeper@gmail.com)
  *   CONTACT_FROM    (optional, default "GEPER Website <onboarding@resend.dev>";
@@ -177,9 +177,9 @@ export async function handleContact(
   return json({ error: 'provider_error' }, res.status === 429 ? 503 : 502);
 }
 
-export const onRequestPost: PagesFunction<Env> = ({ request, env }) => handleContact(request, env);
-
-export const onRequest: PagesFunction<Env> = ({ request }) =>
-  request.method === 'POST'
-    ? json({ error: 'unreachable' }, 500)
+/** Route entry: POST goes to handleContact (unchanged); every other method gets 405. */
+export function handleContactRequest(request: Request, env: Env): Promise<Response> | Response {
+  return request.method === 'POST'
+    ? handleContact(request, env)
     : json({ error: 'method_not_allowed' }, 405, { Allow: 'POST' });
+}

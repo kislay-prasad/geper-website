@@ -5,7 +5,7 @@
  *        RESEND_API_KEY=re_mock
  *        RESEND_API_URL=http://127.0.0.1:8799/emails
  *   2. npm run mock:resend      (terminal 1)
- *   3. npm run dev:pages        (terminal 2)  → http://localhost:8788/contact
+ *   3. npm run dev:worker       (terminal 2)  → http://localhost:8787/contact
  *
  * Every request is printed here. A message whose subject contains "FAILTEST" gets a 500 so the
  * error path can be exercised.

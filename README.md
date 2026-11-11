@@ -24,14 +24,21 @@ Deploy `dist/` to any static host. Routes are `/technology`, `/research`, `/plat
 
 Values are read at build time.
 
-## Contact backend (Cloudflare Pages Function + Resend)
+## Contact backend (Cloudflare Worker + Static Assets + Resend)
 
-`functions/api/contact.ts` serves `POST /api/contact` and emails enquiries via Resend. Server-side env vars
-(Cloudflare Pages → Settings → Variables and Secrets; locally `.dev.vars`): `RESEND_API_KEY` (secret, required),
-`CONTACT_TO` (default `mailgeper@gmail.com`), `CONTACT_FROM` (default `GEPER Website <onboarding@resend.dev>`;
-set to e.g. `GEPER Website <contact@geper.in>` after the domain is verified in Resend), `ALLOWED_ORIGINS` (optional).
-Local test (site + function): `npm run dev:pages` → http://localhost:8788/contact (`npm run dev` does NOT run the function, so the form 404s there).
-Without a real key, use `npm run mock:resend` plus a `.dev.vars` (see `scripts/mock-resend.mjs`). Deploy `dist/` with the `functions/` folder (Pages Git integration does this automatically).
+`worker/index.ts` routes `POST /api/contact` to `worker/contact.ts`, which emails enquiries via Resend. All pages are
+served as static assets from `dist/` (see `wrangler.jsonc`); only `/api/*` runs Worker code.
+Server-side env vars (Worker → Settings → Variables and Secrets, or `wrangler secret put RESEND_API_KEY`; locally `.dev.vars`):
+`RESEND_API_KEY` (secret, required), `CONTACT_TO` (default `mailgeper@gmail.com`), `CONTACT_FROM` (default
+`GEPER Website <onboarding@resend.dev>`; set to e.g. `GEPER Website <contact@geper.in>` once the domain is verified in
+Resend), `ALLOWED_ORIGINS` (optional).
+
+Local test (site + API): `npm run dev:worker` → http://localhost:8787/contact (`npm run dev` does NOT run the Worker, so the
+form 404s there). Without a real key, use `npm run mock:resend` plus a `.dev.vars` containing `RESEND_API_KEY=re_mock` and
+`RESEND_API_URL=http://127.0.0.1:8799/emails` (see `scripts/mock-resend.mjs`). Never set `RESEND_API_URL` in production.
+
+Deploy: Workers Builds (Git) with build command `npm run build` and deploy command `npx wrangler deploy`, or `npm run deploy`.
+The Worker name in `wrangler.jsonc` (`geper-website`) must match the Worker in the dashboard.
 
 ## Contact endpoint contract
 
