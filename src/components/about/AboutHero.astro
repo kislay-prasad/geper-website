@@ -84,7 +84,24 @@ const pixels = Array.from({ length: N }, (_, i) => {
 </script>
 
 <style>
-  .ah { --par: 0; }
+  .ah {
+    --par: 0;
+    /* How strongly the wordmark and its two glitch copies are drawn. These
+       three values are the original desktop design. */
+    --ah-word: 8.5%;
+    --ah-glitch-a: 11%;
+    --ah-glitch-b: 10%;
+  }
+  /* On a phone the word is drawn at about a quarter of its desktop size, so its
+     strokes are far thinner and the same tint disappears. Draw it a little
+     stronger there; nothing else about it changes. */
+  @media not all and (min-width: 40rem) {
+    .ah {
+      --ah-word: 13%;
+      --ah-glitch-a: 16%;
+      --ah-glitch-b: 15%;
+    }
+  }
 
   /* Darker background grid. The layer renders at 60% opacity, so the shared
      .pattern-grid value lands near-invisible here. Raised locally only. */
@@ -114,12 +131,20 @@ const pixels = Array.from({ length: N }, (_, i) => {
     font-size: 18vw;
     line-height: 1;
     letter-spacing: -0.05em;
-    color: color-mix(in srgb, var(--color-ink) 8.5%, transparent);
+    color: color-mix(in srgb, var(--color-ink) var(--ah-word), transparent);
     transform: translate3d(0, calc(var(--par) * -26px), 0);
     will-change: transform;
   }
   @media (min-width: 1024px) {
     .ah-word { font-size: 11rem; }
+  }
+  /* INTELLIGENCE is 12 monospace glyphs, about 6.8em wide, so at 18vw it is
+     ~122vw wide and its last letters are clipped. Below 640px the size is
+     instead fitted to the width available (viewport minus the 1.25rem inset
+     and an equal margin on the other side). 640px and up keeps the original
+     sizes above. */
+  @media not all and (min-width: 40rem) {
+    .ah-word { font-size: calc((100vw - 3rem) / 6.8); }
   }
 
   /* Glitch wave. Two offset copies of the word are drawn from data-text, each
@@ -140,11 +165,11 @@ const pixels = Array.from({ length: N }, (_, i) => {
     animation-timing-function: steps(1, end);
   }
   .ah-word::before {
-    color: color-mix(in srgb, var(--color-accent) 11%, transparent);
+    color: color-mix(in srgb, var(--color-accent) var(--ah-glitch-a), transparent);
     animation-name: ah-glitch-a;
   }
   .ah-word::after {
-    color: color-mix(in srgb, var(--color-fig-coral) 10%, transparent);
+    color: color-mix(in srgb, var(--color-fig-coral) var(--ah-glitch-b), transparent);
     animation-name: ah-glitch-b;
     animation-delay: 0.09s;
   }
@@ -194,6 +219,11 @@ const pixels = Array.from({ length: N }, (_, i) => {
   .ah-dot.is-accent {
     background: var(--color-accent-text);
     opacity: 0.32;
+  }
+  /* Each pixel is 3px scaled by 0.38–0.82, i.e. 1–2.5px: readable beside a
+     wide desktop wordmark, lost on a phone. Half again as large there. */
+  @media not all and (min-width: 40rem) {
+    .ah-dot { width: 4.5px; height: 4.5px; }
   }
 
   /* Detach, hold, and reform. The long hold is what keeps it from reading as
