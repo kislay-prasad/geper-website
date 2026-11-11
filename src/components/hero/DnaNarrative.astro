@@ -19,10 +19,12 @@ const steps = home.narrative;
       <p class="max-w-prose text-body-lg text-ink-2">The same five stages run through everything GEPER builds. Scroll to follow a single variant through them.</p>
     </div>
 
-    <div class="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-10" id="dna-narrative">
-      <!-- Visual: sticky on desktop, on top on mobile -->
-      <div class="order-1 lg:order-2 lg:col-span-6">
-        <div class="sticky top-20 lg:top-24">
+    <div class="flex flex-col gap-8 lg:grid lg:grid-cols-12 lg:gap-10" id="dna-narrative">
+      <!-- Visual: pinned beside the steps on desktop, pinned above them on mobile.
+           It must be a direct child of #dna-narrative: position:sticky only travels inside its
+           parent, so a wrapper as tall as the visual (the old markup) left it nowhere to pin on mobile. -->
+      <div class="sticky top-[4.25rem] z-10 order-1 lg:order-2 lg:col-span-6 lg:top-24 lg:self-start">
+        <div>
           <div id="dna-stage" class="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-bg pattern-grid sm:aspect-[5/4] lg:aspect-[4/5] lg:max-h-[64vh]" data-state="0" data-mode="fallback">
             <!-- Static fallback (always rendered; hidden once WebGL is live) -->
             <svg id="dna-fallback" class="absolute inset-0 h-full w-full" viewBox="0 0 400 400" role="img" aria-labelledby="dna-fb-title dna-fb-desc" preserveAspectRatio="xMidYMid meet">
@@ -106,9 +108,16 @@ const steps = home.narrative;
     let inView = false;
     let raf = 0;
 
-    // Progress across the five steps, from the viewport centre. 0..4.
+    // Below the lg breakpoint the visual is pinned above the steps, so the line that picks the
+    // active step sits in the space under it; on desktop the visual is beside the steps.
+    const stacked = window.matchMedia('not all and (min-width: 64rem)'); // exact complement of Tailwind's lg:
+
+    // Progress across the five steps, from the reading line. 0..4.
     const progress = () => {
-      const centre = window.innerHeight * 0.55;
+      const pinnedBottom = Math.max(stage.getBoundingClientRect().bottom, 0);
+      const centre = stacked.matches
+        ? pinnedBottom + (window.innerHeight - pinnedBottom) * 0.4
+        : window.innerHeight * 0.55;
       const first = steps[0].getBoundingClientRect();
       const last = steps[steps.length - 1].getBoundingClientRect();
       const c0 = first.top + first.height / 2, c1 = last.top + last.height / 2;
@@ -210,6 +219,12 @@ const steps = home.narrative;
     background-image:
       linear-gradient(to right, rgb(var(--grid-ink) / 0.24) 1px, transparent 1px),
       linear-gradient(to bottom, rgb(var(--grid-ink) / 0.24) 1px, transparent 1px);
+  }
+
+  /* Stacked layout: the pinned visual may take at most ~40% of the screen so it can never
+     cover the step text it is explaining (landscape phones, short viewports). */
+  @media not all and (min-width: 64rem) {
+    #dna-stage { max-height: 40vh; max-height: 40svh; }
   }
 
   .dna-step { transition: opacity 200ms; }
