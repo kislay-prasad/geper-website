@@ -3,6 +3,10 @@
   "name": "geper-website",
   "main": "worker/index.ts",
   "compatibility_date": "2026-11-11",
+  "vars": {
+    "CONTACT_FROM": "GEPER Website <contact@geper.in>",
+    "CONTACT_TO": "mailgeper@gmail.com"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
