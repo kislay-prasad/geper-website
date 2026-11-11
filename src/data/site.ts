@@ -13,7 +13,7 @@ export const site = {
   tagline: 'Building the Future of Genomic Intelligence.',
   description:
     'GEPER is a computational genomics company building AI systems for interpreting genomic variation and biological complexity.',
-  url: import.meta.env.PUBLIC_SITE_URL || 'https://www.geper.example',
+  url: import.meta.env.PUBLIC_SITE_URL || 'https://geper.in',
   contactEmail: import.meta.env.PUBLIC_CONTACT_EMAIL || 'contact@geper.in',
   contactEndpoint: import.meta.env.PUBLIC_CONTACT_ENDPOINT || '/api/contact',
   analyticsSrc: import.meta.env.PUBLIC_ANALYTICS_SRC || '',

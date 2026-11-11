@@ -5,7 +5,13 @@ import ThemeToggle from './ThemeToggle.astro';
 const current = Astro.url.pathname.replace(/\/$/, '') || '/';
 const isCurrent = (href: string) => current === href;
 ---
-<header class="fixed inset-x-0 top-0 z-50 border-b border-line-faint bg-bg/85 backdrop-blur-md">
+<header class="fixed inset-x-0 top-0 z-50">
+  <!-- The header's translucent, blurred background and its bottom border live on this layer, not on
+       <header> itself. backdrop-filter makes its element the containing block for fixed-position
+       descendants, so on the header it shrank the mobile menu panel (position: fixed; bottom-0) to the
+       header's own 65px and left it 1px tall. A sibling layer paints the identical look without that
+       side effect; -bottom-px keeps the box 1px taller than the row, exactly as the old border did. -->
+  <div class="pointer-events-none absolute inset-x-0 top-0 -bottom-px -z-10 border-b border-line-faint bg-bg/85 backdrop-blur-md" aria-hidden="true"></div>
   <div class="container-page flex h-16 items-center justify-between lg:h-[4.5rem]">
     <a href="/" class="flex items-center gap-3 overflow-visible rounded-sm" aria-label={`${site.name} — home`}>
       <img src="/brand/geper-mark-160.png" srcset="/brand/geper-mark-160.png 1x, /brand/geper-mark-320.png 2x" width="44" height="28" alt="" class="block h-12 w-auto shrink-0 object-contain" />
