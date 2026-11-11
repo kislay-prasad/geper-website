@@ -14,7 +14,7 @@ export const site = {
   description:
     'GEPER is a computational genomics company building AI systems for interpreting genomic variation and biological complexity.',
   url: import.meta.env.PUBLIC_SITE_URL || 'https://www.geper.example',
-  contactEmail: import.meta.env.PUBLIC_CONTACT_EMAIL || 'mailgeper@gmail.com',
+  contactEmail: import.meta.env.PUBLIC_CONTACT_EMAIL || 'contact@geper.in',
   contactEndpoint: import.meta.env.PUBLIC_CONTACT_ENDPOINT || '/api/contact',
   analyticsSrc: import.meta.env.PUBLIC_ANALYTICS_SRC || '',
   location: 'Chennai, India',
