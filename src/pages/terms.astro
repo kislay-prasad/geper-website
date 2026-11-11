@@ -1,0 +1,143 @@
+---
+/**
+ * Terms of use.
+ *
+ * A legal document, set as one: a single reading column, numbered sections,
+ * ordinary paragraphs. No cards, no per-section rules, no panels.
+ *
+ * The copy states only what is true of an early-stage company's informational
+ * website — no warranties, liability limits or obligations beyond that.
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Section from '@/components/sections/Section.astro';
+import Eyebrow from '@/components/ui/Eyebrow.astro';
+import { site } from '@/data/site';
+
+const updated = site.legalUpdated
+  ? new Date(site.legalUpdated).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  : '';
+
+const clauses = [
+  {
+    index: '01',
+    title: 'Website use',
+    paras: [
+      'This website provides general information about GEPER, its research, technology, projects and activities. It is published for that purpose, and is intended to be read as general information rather than as a description of a service being offered.',
+    ],
+  },
+  {
+    index: '02',
+    title: 'Content and availability',
+    paras: [
+      'Information on this website may change as GEPER’s work develops. Projects and products described here may be under development and are not necessarily available for use, and descriptions reflect the information available at the time of publication.',
+      'GEPER does not guarantee that this website will be available without interruption, or that it will always be free from errors. Access to the website, and the content published on it, may change without notice.',
+    ],
+  },
+  {
+    index: '03',
+    title: 'No professional advice',
+    paras: [
+      'Website content does not constitute medical, clinical, legal, financial or other professional advice. Nothing on this website describes a product that is available for clinical use, and it should not be relied on in making clinical or professional decisions.',
+    ],
+  },
+  {
+    index: '04',
+    title: 'Intellectual property',
+    paras: [
+      'Website content, branding, logos, text, graphics and other materials belong to GEPER or to their respective owners. They may not be reproduced, distributed or otherwise reused without appropriate permission.',
+    ],
+  },
+  {
+    index: '05',
+    title: 'External links',
+    paras: [
+      'This website may reference or link to external websites. GEPER does not control those websites and is not responsible for their content or availability. A reference is not an endorsement.',
+    ],
+  },
+  {
+    index: '06',
+    title: 'Changes to these terms',
+    paras: [
+      'GEPER may update these terms as the company and the website develop. The version published on this page is the version that applies.',
+    ],
+  },
+];
+---
+<BaseLayout title="Terms" noindex description="Terms that apply to using the GEPER website.">
+  <Section pattern="grid" class="tm-page">
+    <!-- Hero -->
+    <div class="tm-col">
+      <Eyebrow>Legal</Eyebrow>
+      <h1 class="mt-4 text-h1 text-ink">Terms of use</h1>
+      <p class="mt-4 text-body-lg text-ink-2">Terms that apply to using this website.</p>
+    </div>
+
+    <!-- Document -->
+    <div class="tm-col tm-doc mt-10 border-t border-line pt-8 md:mt-12">
+      {updated && (
+        <p class="label text-ink-muted">
+          Last updated <time datetime={site.legalUpdated}>{updated}</time>
+        </p>
+      )}
+
+      <p class="mt-6 text-body-lg text-ink-2">
+        These terms apply to use of the GEPER website. They set out what the website is for, how its content should be treated, and how both may change as GEPER’s work develops.
+      </p>
+
+      <ol class="mt-8 flex flex-col gap-11 md:gap-12">
+        {clauses.map((c) => (
+          <li class="tm-clause">
+            <span class="label pt-1.5 text-accent-text" aria-hidden="true">{c.index}</span>
+            <div>
+              <h2 class="text-h3 text-ink">{c.title}</h2>
+              {c.paras.map((p) => <p class="mt-3 max-w-prose text-body text-ink-2">{p}</p>)}
+            </div>
+          </li>
+        ))}
+
+        <li class="tm-clause">
+          <span class="label pt-1.5 text-accent-text" aria-hidden="true">07</span>
+          <div>
+            <h2 class="text-h3 text-ink">Contact</h2>
+            <p class="mt-3 max-w-prose text-body text-ink-2">
+            Questions about these terms can be sent to GEPER at <a href={`mailto:${site.contactEmail}`} class="text-accent-text underline underline-offset-4 hover:text-ink">{site.contactEmail}</a>, or through the <a href="/contact" class="text-accent-text underline underline-offset-4 hover:text-ink">contact page</a>.
+            </p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </Section>
+</BaseLayout>
+
+<style>
+  /* Darker background grid, matching the privacy notice and the rest of the
+     site. Drawn from --grid-ink so it still inverts with the theme; the
+     site-wide token is unchanged.
+
+     The whole selector must be :global — the grid layer AND the .tm-page
+     section are both rendered by Section.astro, so neither carries this page's
+     scope id. */
+  :global(.tm-page .pattern-grid) {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px);
+  }
+
+  /* One centred document column. Wide enough to hold the page, narrow enough
+     that a clause never runs the width of a monitor. */
+  .tm-col {
+    max-width: 56rem;
+    margin-inline: auto;
+  }
+  .tm-doc { padding-bottom: 0.5rem; }
+
+  /* Hanging index: every heading starts on the same line, the number sits in
+     its own gutter and the body hangs with the heading. */
+  .tm-clause {
+    display: grid;
+    grid-template-columns: 2.75rem 1fr;
+  }
+  @media (max-width: 767px) {
+    .tm-clause { grid-template-columns: 2.25rem 1fr; }
+  }
+</style>

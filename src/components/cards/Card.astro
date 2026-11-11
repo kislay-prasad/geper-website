@@ -1,0 +1,11 @@
+---
+/**
+ * Base card: no fill by default, 1px hairline border, optional 2px accent top line
+ * (DESIGN.md: "cards featuring active processes include a 2px top-accent line").
+ */
+interface Props { accent?: boolean; filled?: boolean; class?: string; as?: 'div' | 'li' | 'article' }
+const { accent = false, filled = false, class: className = '', as: Tag = 'div' } = Astro.props;
+---
+<Tag class={`relative rounded-lg border border-line p-6 lg:p-8 ${filled ? 'bg-surface' : ''} ${accent ? 'border-t-2 border-t-accent' : ''} ${className}`}>
+  <slot />
+</Tag>

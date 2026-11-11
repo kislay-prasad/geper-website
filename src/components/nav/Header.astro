@@ -1,0 +1,42 @@
+---
+import { nav, site } from '@/data/site';
+import MobileMenu from './MobileMenu.astro';
+import ThemeToggle from './ThemeToggle.astro';
+const current = Astro.url.pathname.replace(/\/$/, '') || '/';
+const isCurrent = (href: string) => current === href;
+---
+<header class="fixed inset-x-0 top-0 z-50 border-b border-line-faint bg-bg/85 backdrop-blur-md">
+  <div class="container-page flex h-16 items-center justify-between lg:h-[4.5rem]">
+    <a href="/" class="flex items-center gap-3 overflow-visible rounded-sm" aria-label={`${site.name} — home`}>
+      <img src="/brand/geper-mark-160.png" srcset="/brand/geper-mark-160.png 1x, /brand/geper-mark-320.png 2x" width="44" height="28" alt="" class="block h-12 w-auto shrink-0 object-contain" />
+      <span class="text-h3 tracking-tight text-ink">{site.name}</span>
+    </a>
+
+    <nav aria-label="Primary" class="hidden lg:block">
+      <ul class="flex items-center gap-7">
+        {nav.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              aria-current={isCurrent(item.href) ? 'page' : undefined}
+              class={`label py-2 transition-colors ${isCurrent(item.href) ? 'text-accent-text' : 'text-ink-2 hover:text-ink'}`}
+            >{item.label}</a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+
+    <!-- Right-hand cluster. Grouping the CTA, the theme switch and the mobile
+         menu into one flex child keeps the header's justify-between rhythm at
+         the same number of items it had before the switch existed. -->
+    <div class="flex items-center gap-2 lg:gap-3">
+      <a href="/contact" class="hidden min-h-10 items-center gap-2 rounded-md border border-line-strong px-4 text-body-sm text-ink transition-colors hover:border-accent-text hover:text-accent-text lg:inline-flex">
+        Get in touch
+      </a>
+
+      <ThemeToggle />
+
+      <MobileMenu current={current} />
+    </div>
+  </div>
+</header>

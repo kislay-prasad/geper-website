@@ -1,0 +1,130 @@
+---
+/**
+ * Privacy notice.
+ *
+ * Set as a legal document, matching the terms of use: one centred reading
+ * column, numbered sections, ordinary paragraphs. The copy claims no
+ * certification, approval or audit, because none exist, and it is scoped to
+ * services that are still in development.
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Section from '@/components/sections/Section.astro';
+import Eyebrow from '@/components/ui/Eyebrow.astro';
+import { site } from '@/data/site';
+
+const updated = site.legalUpdated
+  ? new Date(site.legalUpdated).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  : '';
+
+const clauses = [
+  {
+    index: '01',
+    title: 'Customer data and derived outputs',
+    paras: [
+      { body: 'Customer-provided material may include genomic sequences, sequencing reads, variant data, FASTA, PDB, mmCIF and other molecular or biological datasets, including proprietary research material and, where applicable, sensitive health-related information.' },
+      { lead: 'Raw customer data.', body: 'Uploaded files, sequences, structures, datasets and other proprietary material remain customer-provided data. GEPER does not treat them as its own datasets.' },
+      { lead: 'Derived data.', body: 'Computational outputs, annotations, embeddings, predictions, reports and analysis results generated from customer inputs are treated according to the applicable customer agreement.' },
+      { lead: 'GEPER infrastructure data.', body: 'System logs, aggregated operational metrics and technical artefacts that contain no customer biological material remain GEPER infrastructure data.' },
+    ],
+  },
+  {
+    index: '02',
+    title: 'Data isolation and model training',
+    paras: [
+      { body: 'Customer-provided data is logically isolated from GEPER’s general research and model-development datasets. It is not used to train, fine-tune or improve GEPER’s general-purpose AI or ML models, or its global training datasets, unless the customer has explicitly authorised that use in a separate written agreement.' },
+      { body: 'Uploaded biological datasets are processed only for the authorised service purpose, and retained only for as long as that purpose requires.' },
+    ],
+    note: 'These provisions describe an intended framework. GEPER holds no certification, regulatory approval or external audit, and claims none.',
+  },
+  {
+    index: '03',
+    title: 'Access, retention and disclosure',
+    paras: [
+      { lead: 'Access.', body: 'Access to customer data is restricted to the personnel and systems required to operate, secure, maintain or support the contracted service.' },
+      { lead: 'Disclosure.', body: 'Customer data may be disclosed only where necessary to provide the contracted service, where required by law, or where otherwise authorised by the applicable agreement.' },
+      { lead: 'Retention.', body: 'Retention and deletion are governed by the applicable service agreement together with operational and legal requirements.' },
+      { lead: 'Website enquiries.', body: 'The name, address, organisation and message submitted through this website are used only to respond to the person who sent them.' },
+    ],
+  },
+];
+---
+<BaseLayout title="Privacy" noindex description="How GEPER handles customer-provided biological data, computational outputs and website enquiries.">
+  <Section pattern="grid" class="pv-page">
+    <!-- Hero -->
+    <div class="pv-col">
+      <Eyebrow>Legal</Eyebrow>
+      <h1 class="mt-4 text-h1 text-ink">Privacy notice</h1>
+      <p class="mt-4 text-body-lg text-ink-2">How GEPER handles customer-provided biological data, computational outputs, and information submitted through this website.</p>
+    </div>
+
+    <!-- Document -->
+    <div class="pv-col pv-doc mt-10 border-t border-line pt-8 md:mt-12">
+      {updated && (
+        <p class="label text-ink-muted">
+          Last updated <time datetime={site.legalUpdated}>{updated}</time>
+        </p>
+      )}
+
+      <p class="mt-6 text-body-lg text-ink-2">
+        GEPER’s platform and Bij AI are in development and not publicly available. The provisions below describe the intended data-handling framework for future services and customer engagements.
+      </p>
+
+      <ol class="mt-8 flex flex-col gap-11 md:gap-12">
+        {clauses.map((c) => (
+          <li class="pv-clause">
+            <span class="label pt-1.5 text-accent-text" aria-hidden="true">{c.index}</span>
+            <div>
+              <h2 class="text-h3 text-ink">{c.title}</h2>
+              {c.paras.map((para) => (
+                <p class="mt-3 max-w-prose text-body text-ink-2">
+                  {para.lead && <strong class="font-medium text-ink">{para.lead}</strong>}{para.lead ? ' ' : ''}{para.body}
+                </p>
+              ))}
+              {c.note && <p class="mt-3 max-w-prose text-body-sm text-ink-muted">{c.note}</p>}
+            </div>
+          </li>
+        ))}
+
+        <li class="pv-clause">
+          <span class="label pt-1.5 text-accent-text" aria-hidden="true">04</span>
+          <div>
+            <h2 class="text-h3 text-ink">Contact</h2>
+            <p class="mt-3 max-w-prose text-body text-ink-2">
+              Questions about this notice, or a request to delete information you have sent, can go to GEPER at <a href={`mailto:${site.contactEmail}`} class="text-accent-text underline underline-offset-4 hover:text-ink">{site.contactEmail}</a>.
+            </p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </Section>
+</BaseLayout>
+
+<style>
+  /* Darker background grid. The layer renders at 70% opacity, so the shared
+     .pattern-grid value lands faint here. Drawn from --grid-ink so it still
+     inverts with the theme; the site-wide token is unchanged.
+
+     The whole selector must be :global — the grid layer AND the .pv-page
+     section are both rendered by Section.astro, so neither carries this page's
+     scope id. */
+  :global(.pv-page .pattern-grid) {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px);
+  }
+
+  /* One centred document column, matching the terms of use. */
+  .pv-col {
+    max-width: 56rem;
+    margin-inline: auto;
+  }
+  .pv-doc { padding-bottom: 0.5rem; }
+
+  .pv-clause {
+    display: grid;
+    grid-template-columns: 2.75rem 1fr;
+  }
+  @media (max-width: 767px) {
+    .pv-clause { grid-template-columns: 2.25rem 1fr; }
+  }
+</style>

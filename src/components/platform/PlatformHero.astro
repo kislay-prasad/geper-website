@@ -1,0 +1,43 @@
+---
+/**
+ * Platform hero. A single left-aligned block: the title is the focal point,
+ * so it is given a measure of its own rather than being squeezed into a
+ * column beside something else. Typography, spacing, grid texture and the
+ * accent eyebrow are unchanged.
+ */
+import { platform } from '@/data/content';
+import Eyebrow from '@/components/ui/Eyebrow.astro';
+---
+<section class="relative overflow-hidden bg-bg" aria-labelledby="platform-title">
+  <div class="platform-hero-grid pointer-events-none absolute inset-0 pattern-grid pattern-fade-y opacity-60" aria-hidden="true"></div>
+
+  <div class="container-page relative py-12 md:py-16 lg:py-20">
+    <div class="ph-copy max-w-4xl">
+      <Eyebrow>{platform.eyebrow}</Eyebrow>
+      <h1 id="platform-title" class="mt-4 text-display text-ink">{platform.headline}</h1>
+      <p class="mt-5 max-w-prose text-body-lg text-ink-2">{platform.lead}</p>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Darker background grid. This layer renders at 60% opacity, so the shared .pattern-grid value lands
+     near-invisible behind the headline.
+     Raised locally; the site-wide token is unchanged. */
+  .platform-hero-grid.pattern-grid {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px);
+  }
+
+  .ph-copy {
+    opacity: 0;
+    transform: translateY(16px);
+    animation: ph-enter 820ms var(--ease-out-quart) forwards;
+  }
+  @keyframes ph-enter { to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ph-copy { opacity: 1; transform: none; animation: none; }
+  }
+</style>

@@ -1,0 +1,359 @@
+---
+/**
+ * The system as a connected pipeline rather than a table.
+ *
+ * One rail runs through five stage nodes. Two things drive it:
+ *
+ *   · reveal — a per-stage observer, one-way. Stacked (mobile) the stages
+ *     arrive one after another; side by side (desktop) they all enter at once
+ *     and the per-stage delay turns that into a left-to-right cascade.
+ *   · progress — scroll position fills the rail and moves a single accent
+ *     marker along the stages, so the flow tracks the reader.
+ *
+ * A warm gradient runs along the rail continuously: the biological material
+ * moving through the system. Blue marks only where the reader is.
+ *
+ * The rail is positioned from the measured node geometry rather than guessed
+ * percentages, so it meets the first and last node exactly in both layouts.
+ */
+import { backbone } from '@/data/site';
+import Eyebrow from '@/components/ui/Eyebrow.astro';
+import StageGlyph from './StageGlyph.astro';
+---
+<section class="relative border-y border-line-faint bg-bg-elevated" aria-labelledby="system-title">
+  <div class="system-grid pointer-events-none absolute inset-0 pattern-grid pattern-fade-y opacity-50" aria-hidden="true"></div>
+
+  <div class="container-page relative py-12 md:py-16 lg:py-20">
+    <div class="mb-10 flex max-w-2xl flex-col gap-3 lg:mb-16">
+      <Eyebrow>The system</Eyebrow>
+      <h2 id="system-title" class="text-h2 text-ink">Five stages, one continuous path.</h2>
+    </div>
+
+    <div class="sp" style="--p:0">
+      <!-- Decorative: the stage list below carries the meaning. -->
+      <div class="sp-rail" aria-hidden="true">
+        <span class="sp-rail-base"></span>
+        <span class="sp-rail-progress"></span>
+        <span class="sp-rail-flow"></span>
+        {/* Discrete marks of biological data travelling the pipeline. Four on
+            offset cycles: one passes any given point every ~2.5s. */}
+        {[0, 1, 2, 3].map((i) => <span class="sp-dot" style={`--d:${(i * 2.5).toFixed(2)}s`}></span>)}
+      </div>
+
+      <ol class="sp-stages">
+        {backbone.map((s, i) => (
+          <li class="sp-stage" data-i={i} style={`--d:${(i * 0.11).toFixed(2)}s`}>
+            {/* The glyph sits in a recessed layer panel so each stage reads as
+                a piece of the system rather than a mark floating in space. */}
+            <div class="sp-panel" aria-hidden="true">
+              <div class="sp-glyph"><StageGlyph stage={s.id} /></div>
+            </div>
+            <span class="sp-node" aria-hidden="true"></span>
+            <div class="sp-copy">
+              <p class="sp-index label">{s.index}</p>
+              <h3 class="sp-title text-h3 text-ink">{s.title}</h3>
+              <p class="sp-summary text-body-sm text-ink-2">{s.summary}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </div>
+</section>
+
+<script>
+  const sp = document.querySelector<HTMLElement>('.sp');
+  const rail = sp?.querySelector<HTMLElement>('.sp-rail');
+  const stages = Array.from(sp?.querySelectorAll<HTMLElement>('.sp-stage') ?? []);
+
+  if (sp && rail && stages.length) {
+    const nodes = stages.map((s) => s.querySelector<HTMLElement>('.sp-node')!);
+    let near = false;
+    let frame = 0;
+    let current = -1;
+
+    /* Reveal is one-way: a stage that has been read never disappears. */
+    const reveal = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          e.target.classList.add('is-reached');
+          reveal.unobserve(e.target);
+        }
+      },
+      { rootMargin: '0px 0px -12% 0px' },
+    );
+    stages.forEach((s) => reveal.observe(s));
+
+    /* Pin the rail to the real node centres, in whichever direction the
+       current layout runs. */
+    const placeRail = () => {
+      const wrap = sp.getBoundingClientRect();
+      const a = nodes[0].getBoundingClientRect();
+      const z = nodes[nodes.length - 1].getBoundingClientRect();
+      const horizontal = Math.abs(z.top - a.top) < 4;
+      sp.dataset.axis = horizontal ? 'x' : 'y';
+
+      if (horizontal) {
+        const y = a.top - wrap.top + a.height / 2;
+        rail.style.cssText =
+          `top:${y}px; bottom:auto; height:1px;` +
+          `left:${a.left - wrap.left + a.width / 2}px;` +
+          `right:${wrap.right - z.left - z.width / 2}px; width:auto;`;
+      } else {
+        const x = a.left - wrap.left + a.width / 2;
+        rail.style.cssText =
+          `left:${x}px; right:auto; width:1px;` +
+          `top:${a.top - wrap.top + a.height / 2}px;` +
+          `bottom:${wrap.bottom - z.top - z.height / 2}px; height:auto;`;
+      }
+
+      /* Travelling marks move by transform, so they need the rail's length in
+         pixels rather than a percentage of their own box. */
+      const r = rail.getBoundingClientRect();
+      sp.style.setProperty('--rail-len', `${Math.round(horizontal ? r.width : r.height)}px`);
+    };
+
+    const paint = () => {
+      frame = 0;
+      const box = sp.getBoundingClientRect();
+      const vh = window.innerHeight;
+
+      /* Progress runs from "the pipeline has entered the reading band" to
+         "its end has passed it", so the rail fills over a real scroll rather
+         than snapping to full the moment the block appears. */
+      const start = vh * 0.85;
+      const end = vh * 0.3;
+      const travel = box.height + (start - end);
+      const p = travel <= 0 ? 1 : (start - box.top) / travel;
+      const clamped = Math.max(0, Math.min(1, p));
+      sp.style.setProperty('--p', clamped.toFixed(4));
+
+      /* One accent marker, moving along the pipeline with the reader. */
+      const next = box.bottom < 0 || box.top > vh
+        ? -1
+        : Math.max(0, Math.min(stages.length - 1, Math.floor(clamped * stages.length)));
+      if (next !== current) {
+        current = next;
+        stages.forEach((s, i) => s.classList.toggle('is-current', i === next));
+      }
+    };
+
+    const onScroll = () => {
+      if (!near || frame) return;
+      frame = requestAnimationFrame(paint);
+    };
+
+    const onResize = () => { placeRail(); onScroll(); };
+
+    new IntersectionObserver(
+      (entries) => {
+        near = entries.some((e) => e.isIntersecting);
+        sp.dataset.live = String(near);
+        if (near) { placeRail(); paint(); }
+      },
+      { rootMargin: '25% 0px' },
+    ).observe(sp);
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize, { passive: true });
+
+    placeRail();
+    paint();
+    /* Fonts landing can shift the node positions under the rail. */
+    if (document.fonts?.ready) void document.fonts.ready.then(placeRail);
+  }
+</script>
+
+<style>
+  /* Darker background grid. This layer renders at only 50% opacity, so it needs a heavier value than the
+     hero above to land at the same visible weight.
+     Raised locally; the site-wide token is unchanged. */
+  .system-grid.pattern-grid {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.34) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.34) 1px, transparent 1px);
+  }
+
+  .sp { position: relative; }
+
+  /* ---------------------------------------------------------------- rail */
+  .sp-rail {
+    position: absolute;
+    pointer-events: none;
+    /* Fallback placement before the script measures the nodes. */
+    left: 5px;
+    top: 0.75rem;
+    bottom: 3rem;
+    width: 1px;
+  }
+  .sp-rail-base,
+  .sp-rail-progress,
+  .sp-rail-flow { position: absolute; inset: 0; }
+
+  .sp-rail-base { background: var(--color-line); }
+
+  .sp-rail-progress {
+    background: var(--color-fig-mid);
+    opacity: 0.85;
+    transform-origin: top;
+    transform: scaleY(var(--p, 0));
+    transition: transform 260ms linear;
+  }
+  .sp[data-axis='x'] .sp-rail-progress { transform-origin: left; transform: scaleX(var(--p, 0)); }
+
+  /* The flowing material: a soft warm band repeating along the rail.
+     background-position is cheap to animate and stays smooth on a laptop. */
+  .sp-rail-flow {
+    opacity: 0;
+    background-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      color-mix(in srgb, var(--color-fig-warm) 85%, transparent) 42%,
+      transparent 62%
+    );
+    background-size: 100% 200px;
+    background-repeat: repeat-y;
+    transition: opacity 800ms ease-out;
+  }
+  .sp[data-live='true'] .sp-rail-flow { opacity: 0.3; animation: sp-flow-y 9s linear infinite; }
+  @keyframes sp-flow-y { to { background-position-y: 200px; } }
+
+  /* --- travelling marks ------------------------------------------------
+     Short warm strokes moving along the rail: the material itself, not a
+     tint on the line. Transform-only, so they stay on the compositor. */
+  .sp-dot {
+    position: absolute;
+    left: -1.5px;
+    top: 0;
+    width: 4px;
+    height: 14px;
+    border-radius: 2px;
+    background: linear-gradient(to bottom, transparent, var(--color-fig-warm), transparent);
+    opacity: 0;
+    will-change: transform;
+  }
+  .sp[data-live='true'] .sp-dot {
+    animation: sp-travel-y 10s linear infinite;
+    animation-delay: var(--d, 0s);
+  }
+  @keyframes sp-travel-y {
+    0%        { transform: translateY(-14px); opacity: 0; }
+    8%        { opacity: 0.85; }
+    88%       { opacity: 0.85; }
+    100%      { transform: translateY(var(--rail-len, 0px)); opacity: 0; }
+  }
+
+  .sp[data-axis='x'] .sp-rail-flow {
+    background-image: linear-gradient(
+      to right,
+      transparent 0%,
+      color-mix(in srgb, var(--color-fig-warm) 85%, transparent) 42%,
+      transparent 62%
+    );
+    background-size: 240px 100%;
+    background-repeat: repeat-x;
+  }
+  .sp[data-axis='x'][data-live='true'] .sp-rail-flow { animation: sp-flow-x 10s linear infinite; }
+  @keyframes sp-flow-x { to { background-position-x: 240px; } }
+
+  .sp[data-axis='x'] .sp-dot {
+    left: 0;
+    top: -1.5px;
+    width: 22px;
+    height: 4px;
+    background: linear-gradient(to right, transparent, var(--color-fig-warm), transparent);
+  }
+  .sp[data-axis='x'][data-live='true'] .sp-dot { animation-name: sp-travel-x; }
+  @keyframes sp-travel-x {
+    0%   { transform: translateX(-22px); opacity: 0; }
+    8%   { opacity: 0.85; }
+    88%  { opacity: 0.85; }
+    100% { transform: translateX(var(--rail-len, 0px)); opacity: 0; }
+  }
+
+  /* ------------------------------------------- stacked (default layout) */
+  .sp-stages { display: flex; flex-direction: column; gap: 2.5rem; }
+
+  .sp-stage {
+    position: relative;
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr);
+    align-items: start;
+    column-gap: 1rem;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 750ms var(--ease-out-quart), transform 750ms var(--ease-out-quart);
+    transition-delay: var(--d, 0s);
+  }
+  .sp-stage.is-reached { opacity: 1; transform: none; }
+
+  .sp-node {
+    grid-column: 1;
+    margin-top: 0.4rem;
+    height: 11px;
+    width: 11px;
+    justify-self: start;
+    border-radius: 9999px;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-bg-elevated);
+    transition: border-color 450ms ease-out, background-color 450ms ease-out;
+  }
+  .sp-stage.is-reached .sp-node { border-color: var(--color-fig-mid); background: var(--color-fig-bright); }
+  /* One blue marker at a time — blue means "here", nothing else. */
+  .sp-stage.is-current .sp-node { border-color: var(--color-accent-text); background: var(--color-accent); }
+
+  .sp-panel {
+    grid-column: 2;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    max-width: 12rem;
+    height: 5.75rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--color-line-faint);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    transition: border-color 450ms ease-out, background-color 450ms ease-out;
+  }
+  .sp-stage.is-reached .sp-panel { border-color: var(--color-line); }
+  .sp-stage.is-current .sp-panel {
+    border-color: var(--color-line-strong);
+    background: var(--color-surface);
+  }
+  .sp-glyph { width: 108px; height: 62px; }
+
+  .sp-copy { grid-column: 2; }
+
+  .sp-index { color: var(--color-ink-faint); transition: color 500ms ease-out; }
+  .sp-stage.is-current .sp-index { color: var(--color-accent-text); }
+  .sp-summary { margin-top: 0.375rem; max-width: 34ch; }
+
+  /* ------------------------------------------------- side by side from lg */
+  @media (min-width: 1024px) {
+    .sp-stages {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      column-gap: 1.5rem;
+      row-gap: 0;
+    }
+    .sp-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      column-gap: 0;
+    }
+    .sp-panel { max-width: none; height: 6.5rem; margin-bottom: 1.25rem; }
+    .sp-node { margin: 0 0 1.25rem; }
+    .sp-summary { max-width: none; }
+    /* Two lines of title everywhere, so the summaries sit on one baseline. */
+    .sp-title { min-height: 3.6rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sp-stage { opacity: 1; transform: none; transition: none; }
+    .sp-rail-progress { transform: none; transition: none; }
+    .sp-rail-flow { animation: none !important; opacity: 0.25; }
+    .sp-dot { display: none; }
+  }
+</style>

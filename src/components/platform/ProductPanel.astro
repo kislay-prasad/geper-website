@@ -1,0 +1,122 @@
+---
+/**
+ * Bij AI — the first-creation introduction.
+ *
+ * Status is carried by one badge at the top and one small pixel callout
+ * closing the detail column. No bordered disclaimer box, no chip row, no rule above the
+ * figure: this should read as a product introduction, not a compliance panel.
+ *
+ * The figure beneath the identity block is the system running, not an
+ * illustration of it: see VariantField.
+ */
+import { platform } from '@/data/content';
+import Eyebrow from '@/components/ui/Eyebrow.astro';
+import StatusBadge from '@/components/ui/StatusBadge.astro';
+import VariantField from './VariantField.astro';
+import AvailabilityCallout from './AvailabilityCallout.astro';
+const P = platform.product;
+---
+<section id="bij-ai" class="relative bg-bg-elevated" aria-labelledby="bij-title">
+  <div class="pointer-events-none absolute inset-0 pattern-dots pattern-fade-y opacity-40" aria-hidden="true"></div>
+
+  <div class="container-page relative pt-10 pb-10 md:pt-14 md:pb-12 lg:pt-16 lg:pb-12">
+    <div class="pp relative overflow-hidden rounded-lg border border-line bg-bg">
+      <span class="pp-rail" aria-hidden="true"></span>
+
+      <div class="grid grid-cols-1 gap-7 p-6 lg:grid-cols-12 lg:gap-10 lg:p-8">
+        <!-- Identity, then the system itself -->
+        <div class="flex flex-col gap-3 lg:col-span-7">
+          <div class="flex flex-wrap items-center gap-3">
+            <Eyebrow rule={false}>First creation</Eyebrow>
+            <StatusBadge status={P.status} />
+          </div>
+
+          <h2 id="bij-title" class="pp-name text-display text-ink">{P.name}</h2>
+          <p class="text-body-lg text-ink-2">{P.tagline}</p>
+
+          <!-- No rule and no frame: the figure continues the identity block
+               rather than sitting apart from it. -->
+          <div class="pp-fig mt-6">
+            <VariantField />
+          </div>
+        </div>
+
+        <!-- Detail -->
+        <div class="flex flex-col gap-6 lg:col-span-5 lg:justify-center">
+          <p class="pp-what text-body text-ink-2">{P.what}</p>
+
+          <div>
+            <p class="label mb-3 text-ink-muted">Who it is for</p>
+            <ul class="flex flex-col gap-1.5">
+              {P.who.map((w, i) => (
+                <li class="pp-who text-body-sm text-ink-2" style={`--d:${(i * 0.08).toFixed(2)}s`}>{w}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div class="pp-status">
+            <AvailabilityCallout />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const pp = document.querySelector<HTMLElement>('.pp');
+  if (pp) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          pp.classList.add('is-in');
+          io.disconnect();
+        }
+      },
+      { rootMargin: '0px 0px -15% 0px' },
+    );
+    io.observe(pp);
+  }
+</script>
+
+<style>
+  /* A warm status rail, matching the in-development badge. */
+  .pp-rail {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 2px;
+    width: 100%;
+    background: linear-gradient(to right, var(--color-data-warn), color-mix(in srgb, var(--color-data-warn) 20%, transparent) 55%, transparent);
+    opacity: 0.75;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 1100ms var(--ease-out-quart);
+  }
+  .pp.is-in .pp-rail { transform: scaleX(1); }
+
+  .pp-name { letter-spacing: -0.035em; }
+
+  /* Supports the title rather than competing with it. */
+  .pp-what { line-height: 1.5; }
+
+  .pp-who,
+  .pp-status {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 600ms var(--ease-out-quart), transform 600ms var(--ease-out-quart);
+    transition-delay: var(--d, 0s);
+  }
+  .pp-status { transition-delay: 0.32s; }
+  .pp.is-in .pp-who,
+  .pp.is-in .pp-status { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pp-rail, .pp-who, .pp-status {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+</style>

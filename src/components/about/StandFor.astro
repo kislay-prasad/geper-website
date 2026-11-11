@@ -1,0 +1,233 @@
+---
+/**
+ * What we stand for. Four principles as an editorial index rather than four
+ * cards: oversized numbers, one open at a time, the rest held quiet.
+ *
+ * Pointer, keyboard and tap all select. A sparse pixel pattern forms around
+ * the active number — the page's motif, used here as emphasis.
+ */
+import { about } from '@/data/content';
+import Eyebrow from '@/components/ui/Eyebrow.astro';
+import { rnd, round } from './pixels';
+
+/* One shared pixel constellation, drawn per principle. Positions are in the
+   number's own box, weighted to its edges so the digits stay readable. */
+const motes = Array.from({ length: 22 }, (_, i) => {
+  const edge = rnd(i, 21) < 0.6;
+  return {
+    x: round(edge ? (rnd(i, 22) < 0.5 ? rnd(i, 23) * 26 : 74 + rnd(i, 23) * 26) : rnd(i, 23) * 100),
+    y: round(rnd(i, 24) * 100),
+    s: rnd(i, 25) < 0.25 ? 3 : 2,
+    d: round(rnd(i, 26) * 0.4, 2),
+    accent: i % 7 === 3,
+  };
+});
+---
+<section class="sf relative bg-bg" aria-labelledby="stand-title">
+  <div class="sf-grid pointer-events-none absolute inset-0 pattern-grid pattern-fade-y opacity-60" aria-hidden="true"></div>
+
+  <div class="container-page relative py-14 md:py-16 lg:py-20">
+    <div class="sf-head max-w-2xl">
+      <Eyebrow>What we stand for</Eyebrow>
+      <h2 id="stand-title" class="mt-4 text-h2 text-ink">Four commitments the company is built on.</h2>
+    </div>
+
+    <ul class="sf-list mt-10">
+      {about.principles.map((p, i) => (
+        <li class:list={['sf-item', i === 0 && 'is-active']} data-i={i} style={`--d:${(i * 0.08).toFixed(2)}s`}>
+          <button
+            class="sf-trigger"
+            type="button"
+            aria-expanded={i === 0 ? 'true' : 'false'}
+            aria-controls={`principle-body-${i}`}
+          >
+            <span class="sf-num" aria-hidden="true">
+              <span class="sf-num-text">{p.index}</span>
+              <span class="sf-motes">
+                {motes.map((m) => (
+                  <span
+                    class:list={['sf-mote', m.accent && 'is-accent']}
+                    style={`left:${m.x}%;top:${m.y}%;width:${m.s}px;height:${m.s}px;--md:${m.d}s`}
+                  ></span>
+                ))}
+              </span>
+            </span>
+            <span class="sf-title text-h3 text-ink">{p.title}</span>
+            <span class="sf-mark" aria-hidden="true"></span>
+          </button>
+
+          <div class="sf-body" id={`principle-body-${i}`}>
+            <div class="sf-body-inner">
+              <p class="max-w-prose text-body text-ink-2">{p.body}</p>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </div>
+</section>
+
+<script>
+  const list = document.querySelector<HTMLElement>('.sf-list');
+  if (list) {
+    const items = [...list.querySelectorAll<HTMLElement>('.sf-item')];
+
+    const select = (el: HTMLElement) => {
+      for (const it of items) {
+        const on = it === el;
+        it.classList.toggle('is-active', on);
+        it.querySelector('.sf-trigger')?.setAttribute('aria-expanded', on ? 'true' : 'false');
+      }
+    };
+
+    for (const it of items) {
+      const btn = it.querySelector<HTMLElement>('.sf-trigger');
+      if (!btn) continue;
+      /* Pointer only on devices that hover — on touch, a tap should not have
+         to fight a hover state it cannot clear. */
+      it.addEventListener('pointerenter', (e) => {
+        if ((e as PointerEvent).pointerType === 'mouse') select(it);
+      });
+      btn.addEventListener('click', () => select(it));
+      btn.addEventListener('focus', () => select(it));
+    }
+
+    /* Reveal the rows once, in order. */
+    const sec = document.querySelector<HTMLElement>('.sf');
+    if (sec) {
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            sec.classList.add('is-in');
+            io.disconnect();
+          }
+        },
+        { rootMargin: '0px 0px -12% 0px' },
+      );
+      io.observe(sec);
+    }
+  }
+</script>
+
+<style>
+  /* Background grid, matching the hero above. The layer renders at 60% opacity,
+     so the shared .pattern-grid value is raised locally to land at the same
+     visible weight as the other sections; the site-wide token is unchanged. */
+  .sf-grid.pattern-grid {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px);
+  }
+
+  .sf-item {
+    border-top: 1px solid var(--color-line-faint);
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 650ms var(--ease-out-quart), transform 650ms var(--ease-out-quart);
+    transition-delay: var(--d);
+  }
+  .sf-item:last-child { border-bottom: 1px solid var(--color-line-faint); }
+  .sf.is-in .sf-item { opacity: 1; transform: none; }
+
+  .sf-trigger {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 1.25rem;
+    width: 100%;
+    padding: 1.25rem 0;
+    text-align: left;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+  @media (min-width: 768px) {
+    .sf-trigger { gap: 2rem; padding: 1.5rem 0; }
+  }
+
+  /* The number carries the state: quiet when inactive, forward when active. */
+  .sf-num {
+    position: relative;
+    display: block;
+    width: 3.25rem;
+    font-family: var(--font-mono);
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--color-ink-faint);
+    transition: color 400ms var(--ease-out-quart);
+  }
+  @media (min-width: 768px) {
+    .sf-num { width: 5rem; font-size: 3.25rem; }
+  }
+  .sf-num-text { position: relative; z-index: 1; }
+
+  .sf-motes {
+    position: absolute;
+    inset: -35% -30%;
+    pointer-events: none;
+  }
+  .sf-mote {
+    position: absolute;
+    background: var(--color-fig-line);
+    opacity: 0;
+    transform: scale(0.4);
+    transition: opacity 500ms var(--ease-out-quart), transform 500ms var(--ease-out-quart);
+    transition-delay: var(--md);
+  }
+  .sf-mote.is-accent { background: var(--color-accent-text); }
+
+  .sf-title {
+    transition: color 400ms var(--ease-out-quart), opacity 400ms var(--ease-out-quart);
+    opacity: 0.5;
+  }
+
+  /* A short rule that draws itself on the active row. */
+  .sf-mark {
+    display: block;
+    width: 2.5rem;
+    height: 1px;
+    background: var(--color-line-strong);
+    transform: scaleX(0.25);
+    transform-origin: right;
+    opacity: 0.5;
+    transition: transform 500ms var(--ease-out-quart), background-color 400ms var(--ease-out-quart), opacity 400ms var(--ease-out-quart);
+  }
+
+  .sf-item.is-active .sf-num { color: var(--color-ink); }
+  .sf-item.is-active .sf-title { opacity: 1; }
+  .sf-item.is-active .sf-mark {
+    transform: scaleX(1);
+    background: var(--color-accent-text);
+    opacity: 0.85;
+  }
+  .sf-item.is-active .sf-mote { opacity: 0.55; transform: scale(1); }
+  .sf-item.is-active .sf-mote.is-accent { opacity: 0.5; }
+
+  /* Description opens without a measured height. */
+  .sf-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 520ms var(--ease-out-quart);
+  }
+  .sf-body-inner {
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 420ms var(--ease-out-quart);
+  }
+  .sf-item.is-active .sf-body { grid-template-rows: 1fr; }
+  .sf-item.is-active .sf-body-inner { opacity: 1; transition-delay: 120ms; }
+
+  /* Indent the body to the title's column. */
+  .sf-body-inner > p { padding: 0 0 1.5rem 4.5rem; }
+  @media (min-width: 768px) {
+    .sf-body-inner > p { padding-left: 7rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sf-item { opacity: 1; transform: none; transition: none; }
+    .sf-mote, .sf-mark, .sf-title, .sf-num, .sf-body, .sf-body-inner { transition: none; }
+  }
+</style>

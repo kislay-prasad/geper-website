@@ -1,0 +1,83 @@
+---
+/**
+ * Research hero. The four-stage strip under the lead is deliberate: a visitor
+ * should be able to read the whole shape of the research in one glance,
+ * before deciding whether to scroll.
+ */
+import { research } from '@/data/content';
+import Eyebrow from '@/components/ui/Eyebrow.astro';
+import ResearchHeroVisual from './ResearchHeroVisual.astro';
+const stages = research.pipeline;
+---
+<section class="relative overflow-hidden bg-bg" aria-labelledby="research-title">
+  <div class="rh-dots pointer-events-none absolute inset-0 pattern-dots pattern-fade-y opacity-60" aria-hidden="true"></div>
+
+  <div class="container-page relative grid grid-cols-1 items-center gap-10 py-12 md:py-16 lg:grid-cols-12 lg:gap-14 lg:py-20">
+    <div class="rh-copy lg:col-span-6 xl:col-span-6">
+      <Eyebrow>{research.eyebrow}</Eyebrow>
+      <h1 id="research-title" class="mt-4 text-display text-ink">{research.headline}</h1>
+      <p class="mt-5 max-w-prose text-body-lg text-ink-2">{research.lead}</p>
+
+      <p class="mt-5 flex items-start gap-3 text-body-sm text-ink-muted">
+        <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>
+        These are directions of active work. Nothing on this page is presented as a completed result.
+      </p>
+
+      <ol class="rh-strip mt-9 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4" aria-label="The research pipeline in four stages">
+        {stages.map((s, i) => (
+          <li class="relative flex flex-col gap-2 border-t border-line pt-3" style={`--d:${(0.15 + i * 0.09).toFixed(2)}s`}>
+            <span class="rh-strip-mark" aria-hidden="true"></span>
+            <span class="label text-ink-muted">{s.index}</span>
+            <span class="text-body-sm font-medium text-ink">{s.label}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+
+    <div class="rh-art lg:col-span-6 xl:col-span-6">
+      <div class="relative mx-auto w-full max-w-[30rem] overflow-hidden rounded-lg border border-line bg-bg-elevated lg:max-w-none">
+        <div class="aspect-[4/5] w-full sm:aspect-[1/1] lg:aspect-[4/5]">
+          <ResearchHeroVisual />
+        </div>
+        <div class="flex items-center justify-between gap-4 border-t border-line-faint px-4 py-2.5">
+          <p class="label text-ink-muted">signal path</p>
+          <p class="label text-ink-muted">schematic</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Darker dot field behind the research hero. The layer renders at 60%
+     opacity, so the shared .pattern-dots value lands faint here. Drawn from
+     --grid-ink like every other pattern, so it still inverts with the theme;
+     the site-wide token is unchanged. */
+  .rh-dots.pattern-dots {
+    background-image: radial-gradient(rgb(var(--grid-ink) / 0.42) 1px, transparent 1.5px);
+  }
+
+  .rh-copy, .rh-art {
+    opacity: 0;
+    transform: translateY(16px);
+    animation: rh-enter 800ms var(--ease-out-quart) forwards;
+  }
+  .rh-art { animation-delay: 140ms; }
+
+  .rh-strip li { opacity: 0; transform: translateY(8px); animation: rh-enter 600ms var(--ease-out-quart) forwards; animation-delay: var(--d, 0s); }
+
+  .rh-strip-mark {
+    position: absolute;
+    top: -1px;
+    left: 0;
+    height: 1px;
+    width: 1.75rem;
+    background: var(--color-fig-mid);
+  }
+
+  @keyframes rh-enter { to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rh-copy, .rh-art, .rh-strip li { opacity: 1; transform: none; animation: none; }
+  }
+</style>

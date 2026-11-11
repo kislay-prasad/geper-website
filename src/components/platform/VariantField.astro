@@ -1,0 +1,285 @@
+---
+/**
+ * Bij AI's working figure: variant signals resolving into something a person
+ * can review, running continuously.
+ *
+ *   SIGNALS      scattered pixel-scale variant fragments, twinkling
+ *   STRUCTURED   the same material organised into addressed grids, with
+ *                cells that stay empty where information is missing
+ *   WEIGHED      evidence aggregated against a frame
+ *   FOR REVIEW   a resolved readout handed to an expert
+ *
+ * Everything is declarative SVG + CSS keyframes — no rAF loop, no library.
+ * Motion is gated on `data-live`, so nothing animates off screen, and the
+ * whole system stops under prefers-reduced-motion with the resolved state
+ * left on screen.
+ *
+ * Colour: greys carry the system. Warm amber marks biological material worth
+ * attention; blue appears twice, on the resolved conclusion. Nothing glows.
+ */
+
+/* Deterministic pseudo-random — the server render must be stable. */
+const rnd = (i: number) => {
+  const x = Math.sin(i * 127.1) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+/* --- signals ------------------------------------------------------------ */
+const signals = Array.from({ length: 30 }, (_, i) => ({
+  i,
+  x: +(16 + rnd(i) * 84).toFixed(1),
+  y: +(28 + rnd(i + 50) * 162).toFixed(1),
+  tone: i % 11 === 3 ? 'warm' : i % 17 === 5 ? 'accent' : '',
+}));
+
+/* --- structured grids --------------------------------------------------- */
+const GX = 140;
+const PITCH = 9;
+const CELL = 6;
+const blockY = [34, 100, 166];
+/* cells deliberately left empty: information that is absent stays absent */
+const absent = new Set(['0-3-1', '1-1-2', '2-2-0']);
+const blocks = blockY.map((y0, b) => ({
+  b,
+  y0,
+  cy: y0 + 12,
+  cells: Array.from({ length: 12 }, (_, n) => {
+    const c = n % 4;
+    const r = Math.floor(n / 4);
+    return { n, c, r, x: GX + c * PITCH, y: y0 + r * PITCH, absent: absent.has(`${b}-${c}-${r}`) };
+  }),
+}));
+
+/* --- weighed evidence --------------------------------------------------- */
+const bars = [56, 38, 72, 44, 62, 30].map((w, i) => ({
+  i,
+  w,
+  y: 52 + i * 20,
+  tone: i === 2 ? 'warm' : '',
+}));
+
+/* --- resolved readout --------------------------------------------------- */
+const rows = [40, 28, 46, 34, 22].map((w, i) => ({
+  i,
+  w,
+  y: 56 + i * 20,
+  tone: i === 2 ? 'accent' : i === 0 ? 'warm' : '',
+}));
+
+const curve = (x1: number, y1: number, x2: number, y2: number) => {
+  const mx = (x1 + x2) / 2;
+  return `M${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+};
+
+const aToB = blocks.map((b, i) => curve(102, 46 + i * 66, GX - 4, b.cy));
+const bToC = blocks.map((b, i) => curve(GX + 3 * PITCH + CELL + 4, b.cy, 286, 66 + i * 36));
+const cToD = curve(378, 108, 420, 104);
+---
+<figure class="vf" data-live="false">
+  <svg viewBox="0 0 520 230" class="block h-full w-full" role="img" aria-labelledby="vf-t vf-d" preserveAspectRatio="xMidYMid meet">
+    <title id="vf-t">Variant signals resolving into a reviewable interpretation</title>
+    <desc id="vf-d">Scattered genomic signals organise into structured grids, pass through an evidence-weighing stage, and resolve into a readout prepared for expert review.</desc>
+
+    <!-- connecting paths, drawn under everything -->
+    <g class="vf-paths">
+      {[...aToB, ...bToC, cToD].map((d) => <path d={d} class="vf-path" />)}
+      {[...aToB, ...bToC, cToD].map((d, i) => (
+        <path d={d} class="vf-pulse" style={`--d:${(i * 1.9).toFixed(2)}s`} />
+      ))}
+    </g>
+
+    <!-- 01 · signals -->
+    <g class="vf-signals">
+      {signals.map((s) => (
+        <rect x={s.x} y={s.y} width="3" height="3"
+          class={`vf-px ${s.tone ? `vf-px--${s.tone}` : ''}`}
+          style={`--d:${(rnd(s.i + 7) * 6).toFixed(2)}s`} />
+      ))}
+      <path d="M16 22 L16 16 L100 16 L100 22" class="vf-bracket" />
+    </g>
+
+    <!-- 02 · structured -->
+    <g class="vf-blocks">
+      {blocks.map((b) => (
+        <g class="vf-block" style={`--d:${(b.b * 1.5).toFixed(2)}s`}>
+          {b.cells.map((c) => (
+            <rect x={c.x} y={c.y} width={CELL} height={CELL} rx="0.5"
+              class={c.absent ? 'vf-cell vf-cell--absent' : 'vf-cell'}
+              style={`--d:${(b.b * 1.5 + c.n * 0.09).toFixed(2)}s`} />
+          ))}
+        </g>
+      ))}
+    </g>
+
+    <!-- 03 · weighed -->
+    <g class="vf-weigh">
+      {bars.map((b) => (
+        <g>
+          <rect x="290" y={b.y} width={b.w} height="5" rx="1"
+            class={`vf-bar ${b.tone ? `vf-bar--${b.tone}` : ''}`}
+            style={`--d:${(b.i * 0.55).toFixed(2)}s`} />
+          <rect x={290 + b.w + 5} y={b.y + 1} width="3" height="3" class="vf-bardot" style={`--d:${(b.i * 0.55).toFixed(2)}s`} />
+        </g>
+      ))}
+      <line x1="378" y1="44" x2="378" y2="172" class="vf-axis" />
+      {[44, 76, 108, 140, 172].map((y) => <line x1="375" y1={y} x2="381" y2={y} class="vf-axistick" />)}
+    </g>
+
+    <!-- 04 · for review -->
+    <g class="vf-readout">
+      <path d="M420 42 L414 42 L414 178 L420 178" class="vf-bracket" />
+      {rows.map((r) => (
+        <g style={`--d:${(1.2 + r.i * 0.22).toFixed(2)}s`}>
+          <rect x={424} y={r.y} width="4" height="4"
+            class={`vf-mark ${r.tone ? `vf-mark--${r.tone}` : ''}`} />
+          <rect x={434} y={r.y + 0.5} width={r.w} height="3" rx="1"
+            class={`vf-row ${r.tone ? `vf-row--${r.tone}` : ''}`} />
+        </g>
+      ))}
+    </g>
+
+    <text x="58" y="220" class="vf-micro">SIGNALS</text>
+    <text x="158" y="220" class="vf-micro">STRUCTURED</text>
+    <text x="336" y="220" class="vf-micro">WEIGHED</text>
+    <text x="458" y="220" class="vf-micro">FOR REVIEW</text>
+  </svg>
+</figure>
+
+<script>
+  const fig = document.querySelector<HTMLElement>('.vf');
+  if (fig) {
+    new IntersectionObserver(
+      (entries) => entries.forEach((e) => { fig.dataset.live = String(e.isIntersecting); }),
+      { rootMargin: '15% 0px' },
+    ).observe(fig);
+  }
+</script>
+
+<style>
+  .vf { width: 100%; aspect-ratio: 520 / 230; }
+
+  /* Hover brings the connective tissue forward. Nothing moves faster, nothing
+     changes colour — the system just becomes a little more legible. */
+  .vf:hover .vf-path { opacity: 0.8; }
+  .vf:hover .vf-axis,
+  .vf:hover .vf-axistick,
+  .vf:hover .vf-bracket { opacity: 0.85; }
+
+  /* Below `sm` the figure renders too small for these to be legible, so they
+     are dropped rather than shown as unreadable specks. */
+  .vf-micro { display: none; }
+  @media (min-width: 640px) {
+    .vf-micro { display: block; }
+  }
+  .vf-micro {
+    font-family: var(--font-mono);
+    font-size: 7.5px;
+    letter-spacing: 0.14em;
+    text-anchor: middle;
+    fill: var(--color-ink-faint);
+    transition: fill 400ms ease-out;
+  }
+  .vf:hover .vf-micro { fill: var(--color-ink-muted); }
+
+  .vf-bracket { fill: none; stroke: var(--color-line-strong); stroke-width: 1; opacity: 0.55; transition: opacity 400ms ease-out; }
+
+  /* --- paths ---------------------------------------------------------- */
+  .vf-path { fill: none; stroke: var(--color-line-strong); stroke-width: 1; opacity: 0.45; transition: opacity 400ms ease-out; }
+  .vf-pulse {
+    fill: none;
+    stroke: var(--color-fig-bright);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-dasharray: 3 240;
+    opacity: 0;
+  }
+  .vf[data-live='true'] .vf-pulse {
+    animation: vf-flow 9s linear infinite;
+    animation-delay: var(--d, 0s);
+  }
+  @keyframes vf-flow {
+    0%        { stroke-dashoffset: 240; opacity: 0; }
+    6%        { opacity: 0.7; }
+    38%       { opacity: 0.7; }
+    44%, 100% { stroke-dashoffset: -40; opacity: 0; }
+  }
+
+  /* --- 01 · signals: pixel-scale, twinkling on long offsets ------------ */
+  .vf-px { fill: var(--color-fig-mid); opacity: 0.55; }
+  .vf-px--warm { fill: var(--color-fig-warm); }
+  .vf-px--accent { fill: var(--color-accent-text); }
+  .vf[data-live='true'] .vf-px { animation: vf-twinkle 7s ease-in-out infinite; animation-delay: var(--d, 0s); }
+  @keyframes vf-twinkle {
+    0%, 100% { opacity: 0.3; }
+    50%      { opacity: 0.9; }
+  }
+
+  /* --- 02 · structured: cells address in sequence ---------------------- */
+  .vf-cell { fill: var(--color-fig-mid); opacity: 0.25; }
+  .vf-cell--absent {
+    fill: none;
+    stroke: var(--color-ink-faint);
+    stroke-width: 0.8;
+    stroke-dasharray: 1.5 1.5;
+    opacity: 0.7;
+  }
+  .vf[data-live='true'] .vf-cell:not(.vf-cell--absent) {
+    animation: vf-address 9s ease-in-out infinite;
+    animation-delay: var(--d, 0s);
+  }
+  @keyframes vf-address {
+    0%, 72%, 100% { opacity: 0.22; fill: var(--color-fig-mid); }
+    12%, 46%      { opacity: 0.9; fill: var(--color-fig-bright); }
+  }
+
+  /* --- 03 · weighed ---------------------------------------------------- */
+  .vf-bar {
+    fill: var(--color-fig-line);
+    transform-box: fill-box;
+    transform-origin: left;
+  }
+  .vf-bar--warm { fill: var(--color-fig-warm); }
+  .vf[data-live='true'] .vf-bar { animation: vf-weigh 9s var(--ease-out-quart) infinite; animation-delay: var(--d, 0s); }
+  @keyframes vf-weigh {
+    0%, 100% { transform: scaleX(0.28); opacity: 0.45; }
+    30%, 70% { transform: scaleX(1); opacity: 0.9; }
+  }
+  .vf-bardot { fill: var(--color-fig-mid); opacity: 0; }
+  .vf[data-live='true'] .vf-bardot { animation: vf-dot 9s ease-in-out infinite; animation-delay: var(--d, 0s); }
+  @keyframes vf-dot { 0%, 24%, 100% { opacity: 0; } 34%, 68% { opacity: 0.8; } }
+
+  .vf-axis { stroke: var(--color-fig-mid); stroke-width: 1; opacity: 0.6; transition: opacity 400ms ease-out; }
+  .vf-axistick { stroke: var(--color-fig-mid); stroke-width: 1; opacity: 0.45; transition: opacity 400ms ease-out; }
+
+  /* --- 04 · for review: the only blue in the figure -------------------- */
+  .vf-mark { fill: var(--color-fig-mid); opacity: 0; }
+  .vf-row { fill: var(--color-fig-line); opacity: 0; transform-box: fill-box; transform-origin: left; }
+  .vf-mark--warm { fill: var(--color-fig-warm); }
+  .vf-row--warm { fill: var(--color-fig-warm); }
+  .vf-mark--accent { fill: var(--color-accent); }
+  .vf-row--accent { fill: var(--color-accent-text); }
+
+  .vf[data-live='true'] .vf-mark,
+  .vf[data-live='true'] .vf-row {
+    animation: vf-resolve 9s var(--ease-out-quart) infinite;
+    animation-delay: var(--d, 0s);
+  }
+  @keyframes vf-resolve {
+    0%, 100% { opacity: 0; transform: scaleX(0.2); }
+    40%      { opacity: 0.9; transform: scaleX(1); }
+    82%      { opacity: 0.9; transform: scaleX(1); }
+  }
+
+  /* ------------------------------------------------------------- a11y */
+  @media (prefers-reduced-motion: reduce) {
+    .vf :global(*) { animation: none !important; }
+    .vf-pulse { display: none; }
+    /* leave the system in its resolved state */
+    .vf-px { opacity: 0.55; }
+    .vf-cell { opacity: 0.8; fill: var(--color-fig-bright); }
+    .vf-cell--absent { opacity: 0.7; fill: none; }
+    .vf-bar { transform: none; opacity: 0.85; }
+    .vf-bardot { opacity: 0.8; }
+    .vf-mark, .vf-row { opacity: 0.9; transform: none; }
+  }
+</style>

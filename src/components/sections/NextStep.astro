@@ -1,0 +1,19 @@
+---
+/** Every page ends with a next step in the journey. */
+import Button from '@/components/ui/Button.astro';
+interface Props { label: string; title: string; body: string; href: string; cta: string; secondaryHref?: string; secondaryCta?: string }
+const { label, title, body, href, cta, secondaryHref, secondaryCta } = Astro.props;
+---
+<section class="border-t border-line-faint bg-bg-elevated" aria-labelledby="next-step-title">
+  <div class="container-page grid grid-cols-1 gap-6 py-10 md:grid-cols-12 md:items-center lg:py-12">
+    <div class="md:col-span-8">
+      <p class="label text-ink-muted mb-3">{label}</p>
+      <h2 id="next-step-title" class="text-h2 text-ink">{title}</h2>
+      <p class="mt-2 max-w-prose text-body text-ink-2">{body}</p>
+    </div>
+    <div class="flex flex-wrap gap-3 md:col-span-4 md:justify-end">
+      <Button href={href} icon="arrow-right">{cta}</Button>
+      {secondaryHref && secondaryCta && <Button href={secondaryHref} variant="ghost">{secondaryCta}</Button>}
+    </div>
+  </div>
+</section>

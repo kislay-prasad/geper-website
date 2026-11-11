@@ -1,0 +1,120 @@
+---
+/**
+ * Hero visual: the relationship between biological systems, computational
+ * intelligence and people. Pure SVG + CSS — renders complete on first paint
+ * (no layout shift, no WebGL), animates subtly with CSS only, and freezes
+ * under prefers-reduced-motion. GEPER sits at the centre where the three meet.
+ */
+import { home } from '@/data/content';
+const [nature, ai, human] = home.triad;
+const cx = 300, cy = 300, R = 190;
+const ang = (deg: number) => ((deg - 90) * Math.PI) / 180;
+const pos = (deg: number, r = R) => ({ x: cx + Math.cos(ang(deg)) * r, y: cy + Math.sin(ang(deg)) * r });
+const N = pos(0), A = pos(120), H = pos(240);
+const desc = 'Three connected nodes around the GEPER system: biological systems, computational intelligence and people, with data flowing between them.';
+---
+<div class="hero-triad relative mx-auto w-full max-w-[560px]" aria-hidden="false">
+  <svg viewBox="0 0 600 600" class="block h-auto w-full" role="img" aria-labelledby="triad-title triad-desc">
+    <title id="triad-title">Intelligence, biology and people</title>
+    <desc id="triad-desc">{desc}</desc>
+    <defs>
+      <clipPath id="triad-clip"><circle cx={cx} cy={cy} r="278" /></clipPath>
+      <pattern id="triad-grid" width="30" height="30" patternUnits="userSpaceOnUse">
+        <path d="M30 0H0V30" fill="none" stroke="var(--color-line-faint)" stroke-width="1" />
+      </pattern>
+      <radialGradient id="triad-glow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="var(--color-accent)" stop-opacity="0.16" />
+        <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0" />
+      </radialGradient>
+    </defs>
+
+    <!-- field -->
+    <circle cx={cx} cy={cy} r="278" fill="url(#triad-grid)" clip-path="url(#triad-clip)" />
+    <circle cx={cx} cy={cy} r="278" fill="url(#triad-glow)" />
+    <circle cx={cx} cy={cy} r="278" fill="none" stroke="var(--color-line)" />
+    <circle cx={cx} cy={cy} r={R} fill="none" stroke="var(--color-line-faint)" stroke-dasharray="2 6" class="triad-orbit" />
+
+    <!-- connections: the triangle of relationships -->
+    <g fill="none" stroke="var(--color-line-strong)" stroke-width="1">
+      <path d={`M${N.x} ${N.y} L${A.x} ${A.y}`} />
+      <path d={`M${A.x} ${A.y} L${H.x} ${H.y}`} />
+      <path d={`M${H.x} ${H.y} L${N.x} ${N.y}`} />
+    </g>
+    <!-- flow: biology → intelligence → people → (feedback) biology -->
+    <g fill="none" stroke="var(--color-accent-text)" stroke-width="1.5" stroke-linecap="round" class="triad-flow">
+      <path d={`M${N.x} ${N.y} L${A.x} ${A.y}`} />
+      <path d={`M${A.x} ${A.y} L${H.x} ${H.y}`} style="animation-delay:-1.3s" />
+      <path d={`M${H.x} ${H.y} L${N.x} ${N.y}`} style="animation-delay:-2.6s" />
+    </g>
+    <!-- spokes to the centre -->
+    <g fill="none" stroke="var(--color-line)" stroke-width="1">
+      <path d={`M${N.x} ${N.y} L${cx} ${cy - 58}`} />
+      <path d={`M${A.x} ${A.y} L${cx + 50} ${cy + 29}`} />
+      <path d={`M${H.x} ${H.y} L${cx - 50} ${cy + 29}`} />
+    </g>
+
+    <!-- centre: the GEPER system where the three meet -->
+    <g>
+      <circle cx={cx} cy={cy} r="58" fill="var(--color-bg-elevated)" stroke="var(--color-line-strong)" />
+      <circle cx={cx} cy={cy} r="58" fill="none" stroke="var(--color-accent)" stroke-opacity="0.6" stroke-dasharray="4 8" class="triad-core" />
+      <circle cx={cx} cy={cy} r="30" fill="none" stroke="var(--color-accent-text)" stroke-width="1.5" />
+      <circle cx={cx} cy={cy} r="9" fill="var(--color-accent)" />
+      <text x={cx} y={cy + 78} text-anchor="middle" font-family="var(--font-mono)" font-size="11" letter-spacing="1.5" fill="var(--color-accent-text)">GEPER</text>
+    </g>
+
+    <!-- nature node: helix motif -->
+    <g transform={`translate(${N.x} ${N.y})`}>
+      <circle r="52" fill="var(--color-bg)" stroke="var(--color-accent-text)" />
+      <g fill="none" stroke="var(--color-accent-text)" stroke-width="1.5" stroke-linecap="round" transform="scale(1.45)">
+        <path d="M-9 -22c0 11 18 11 18 22s-18 11-18 22" />
+        <path d="M9 -22c0 11-18 11-18 22s18 11 18 22" />
+        <path d="M-6 -12h12M-6 12h12M-3 0h6" stroke-opacity="0.7" />
+      </g>
+    </g>
+    <!-- ai node: lattice motif -->
+    <g transform={`translate(${A.x} ${A.y})`}>
+      <circle r="52" fill="var(--color-bg)" stroke="var(--color-accent-text)" />
+      <g fill="none" stroke="var(--color-accent-text)" stroke-width="1.5" transform="scale(1.45)">
+        <path d="M-18 -10L0 -20L18 -10M-18 -10L0 0L18 -10M-18 -10V10L0 20L18 10V-10M0 0V20" stroke-opacity="0.8" />
+      </g>
+      <g fill="var(--color-accent-text)" transform="scale(1.45)">
+        <circle cx="0" cy="-20" r="2.5" /><circle cx="-18" cy="-10" r="2.5" /><circle cx="18" cy="-10" r="2.5" />
+        <circle cx="0" cy="0" r="2.5" /><circle cx="-18" cy="10" r="2.5" /><circle cx="18" cy="10" r="2.5" /><circle cx="0" cy="20" r="2.5" />
+      </g>
+    </g>
+    <!-- human node: person motif -->
+    <g transform={`translate(${H.x} ${H.y})`}>
+      <circle r="52" fill="var(--color-bg)" stroke="var(--color-accent-text)" />
+      <g fill="none" stroke="var(--color-accent-text)" stroke-width="1.5" stroke-linecap="round" transform="scale(1.45)">
+        <circle cx="0" cy="-9" r="7" />
+        <path d="M-15 18a15 15 0 0 1 30 0" />
+      </g>
+    </g>
+
+    <!-- labels -->
+    <g font-family="var(--font-mono)" font-size="11" letter-spacing="1.5" fill="var(--color-ink-2)" text-anchor="middle">
+      <text x={N.x} y={N.y - 70}>{nature.label.toUpperCase()}</text>
+      <text x={A.x} y={A.y + 78}>{ai.label.toUpperCase()}</text>
+      <text x={H.x} y={H.y + 78}>{human.label.toUpperCase()}</text>
+    </g>
+  </svg>
+
+</div>
+
+<style>
+  .triad-flow path {
+    stroke-dasharray: 6 160;
+    animation: triad-flow 3.9s linear infinite;
+  }
+  @keyframes triad-flow {
+    from { stroke-dashoffset: 166; }
+    to { stroke-dashoffset: 0; }
+  }
+  .triad-orbit, .triad-core { transform-origin: 300px 300px; animation: triad-orbit 90s linear infinite; }
+  .triad-core { animation-duration: 40s; animation-direction: reverse; }
+  @keyframes triad-orbit { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .triad-flow path, .triad-orbit, .triad-core { animation: none; }
+    .triad-flow path { stroke-dasharray: none; stroke-opacity: 0.45; }
+  }
+</style>

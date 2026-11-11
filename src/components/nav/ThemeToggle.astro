@@ -1,0 +1,139 @@
+---
+/**
+ * Light / dark switch — pixel double helix.
+ *
+ * Built from the same parts as the header's "Get in touch" control: the same
+ * border token, radius and height, so it reads as one of GEPER's technical
+ * controls rather than a floating icon button.
+ *
+ * The glyph is twelve square pixels tracing two strands of a helix. Each pixel
+ * knows two positions — the light-state phase and the dark-state phase, a
+ * quarter turn further round — and CSS moves it between them on the root
+ * `data-theme`. So the state change IS the helix advancing: the pixels
+ * reorganise into a new arrangement rather than one icon replacing another.
+ * Nothing rotates and nothing glows.
+ *
+ * Geometry is computed here, once, from a fixed table — the markup is
+ * byte-stable across builds and there is no runtime layout work. Because both
+ * positions live in the markup, the correct state is present in the very first
+ * paint with no scripting involved.
+ *
+ * The label states the ACTION, not the state, which is what a screen-reader
+ * user needs from a button.
+ */
+const ROWS = 6;
+const PX = 2;          /* pixel edge, user units */
+const CX = 7;          /* strand centre */
+const AMP = 4.2;       /* how far the strands swing apart */
+const round = (n: number) => Math.round(n * 100) / 100;
+
+/* One pixel per strand per row. The dark state is the same helix a quarter
+   turn on, which is why the two arrangements read as one structure moving. */
+const pixels = Array.from({ length: ROWS }, (_, row) => {
+  const phase = (row * Math.PI) / (ROWS - 1);
+  const build = (dir: 1 | -1) => ({
+    row,
+    y: round(0.6 + row * 2.76),
+    xLight: round(CX + dir * AMP * Math.cos(phase) - PX / 2),
+    xDark: round(CX + dir * AMP * Math.cos(phase + Math.PI / 2) - PX / 2),
+  });
+  return [build(1), build(-1)];
+}).flat();
+
+/* Two pixels carry meaning rather than structure, using the palette the
+   figures already use: blue for computation, green for biology. */
+const TONE: Record<number, string> = { 2: 'is-blue', 9: 'is-green' };
+---
+<button
+  type="button"
+  class="theme-toggle inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border border-line-strong text-ink transition-colors hover:border-accent-text hover:text-accent-text"
+  data-theme-toggle
+  aria-label="Switch to dark theme"
+>
+  <svg class="tt-helix" width="17" height="18" viewBox="0 0 14 17" fill="none" aria-hidden="true" focusable="false">
+    {pixels.map((p, i) => (
+      <rect
+        class:list={['tt-px', TONE[i]]}
+        width={PX}
+        height={PX}
+        rx="0.35"
+        x="0"
+        y={p.y}
+        style={`--xl:${p.xLight}px;--xd:${p.xDark}px;--d:${(p.row * 26)}ms`}
+      />
+    ))}
+  </svg>
+</button>
+
+<script>
+  const KEY = 'geper-theme';
+  const btn = document.querySelector<HTMLButtonElement>('[data-theme-toggle]');
+  const root = document.documentElement;
+
+  const label = () =>
+    btn?.setAttribute(
+      'aria-label',
+      root.getAttribute('data-theme') === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
+    );
+
+  label();
+
+  btn?.addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+
+    /* Colours are only transitioned during a deliberate switch. Leaving the
+       transition on permanently would make every hover and scroll-driven
+       colour change lag behind by the same duration. */
+    root.classList.add('theme-switching');
+    if (next === 'dark') root.setAttribute('data-theme', 'dark');
+    else root.removeAttribute('data-theme');
+
+    document
+      .querySelector('meta[data-theme-color]')
+      ?.setAttribute('content', next === 'dark' ? '#16151a' : '#f6f3ec');
+
+    try {
+      localStorage.setItem(KEY, next);
+    } catch (e) {
+      /* Storage unavailable: the switch still works for this page view. */
+    }
+
+    label();
+    setTimeout(() => root.classList.remove('theme-switching'), 320);
+  });
+</script>
+
+<style>
+  /* Each pixel sits at its light-state x and slides to its dark-state x. The
+     per-row delay is what makes it read as a structure reorganising rather
+     than twelve squares moving at once. */
+  .tt-px {
+    fill: var(--color-ink-2);
+    transform: translateX(var(--xl));
+    transition:
+      transform 380ms var(--ease-out-quart),
+      fill 260ms var(--ease-out-quart);
+    transition-delay: var(--d), 0ms;
+  }
+  .tt-px.is-blue { fill: var(--color-sci-blue); }
+  .tt-px.is-green { fill: var(--color-sci-green); }
+
+  :global(:root[data-theme="dark"]) .tt-px {
+    transform: translateX(var(--xd));
+    /* Slightly more luminous on the dark ground, as the figures are. */
+    fill: var(--color-ink);
+  }
+  :global(:root[data-theme="dark"]) .tt-px.is-blue { fill: var(--color-sci-blue); }
+  :global(:root[data-theme="dark"]) .tt-px.is-green { fill: var(--color-sci-green); }
+
+  .theme-toggle { padding-inline: 0.6rem; }
+  /* Hover firms the strand up rather than moving it — the button's own border
+     and colour transition carry the rest. */
+  .theme-toggle:hover .tt-px { fill: var(--color-ink); }
+  .theme-toggle:hover .tt-px.is-blue { fill: var(--color-sci-blue); }
+  .theme-toggle:hover .tt-px.is-green { fill: var(--color-sci-green); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tt-px { transition: none; }
+  }
+</style>

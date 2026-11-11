@@ -1,0 +1,223 @@
+---
+/**
+ * "How the system works" — five text steps on the left, one visual on the right.
+ * The visual is a static SVG first (server-rendered, meaningful on its own).
+ * When the section approaches the viewport, and only if the device supports
+ * WebGL and is not low-end, the Three.js scene is lazy-loaded and takes over.
+ * Scroll position drives the scene state; there is no idle animation loop.
+ */
+import { home } from '@/data/content';
+import { backbone } from '@/data/site';
+import Eyebrow from '@/components/ui/Eyebrow.astro';
+const steps = home.narrative;
+---
+<section id="how-it-works" class="relative border-y border-line-faint bg-bg-elevated" aria-labelledby="how-title">
+  <div class="container-page py-10 md:py-12 lg:py-14">
+    <div class="mb-8 flex flex-col gap-3 lg:mb-10">
+      <Eyebrow>How the system works</Eyebrow>
+      <h2 id="how-title" class="text-h2 text-ink max-w-2xl">From sequence to interpretation, in five stages.</h2>
+      <p class="max-w-prose text-body-lg text-ink-2">The same five stages run through everything GEPER builds. Scroll to follow a single variant through them.</p>
+    </div>
+
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-10" id="dna-narrative">
+      <!-- Visual: sticky on desktop, on top on mobile -->
+      <div class="order-1 lg:order-2 lg:col-span-6">
+        <div class="sticky top-20 lg:top-24">
+          <div id="dna-stage" class="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-bg pattern-grid sm:aspect-[5/4] lg:aspect-[4/5] lg:max-h-[64vh]" data-state="0" data-mode="fallback">
+            <!-- Static fallback (always rendered; hidden once WebGL is live) -->
+            <svg id="dna-fallback" class="absolute inset-0 h-full w-full" viewBox="0 0 400 400" role="img" aria-labelledby="dna-fb-title dna-fb-desc" preserveAspectRatio="xMidYMid meet">
+              <title id="dna-fb-title">A DNA double helix with one variant highlighted</title>
+              <desc id="dna-fb-desc">Illustration of the five stages: biological data, computational representation, models, interpretation and output.</desc>
+              <g id="fb-helix" stroke-width="1.5" fill="none">
+                {Array.from({ length: 22 }).map((_, i) => {
+                  const y = 40 + i * 15;
+                  const ang = i * 0.55;
+                  const x1 = 200 + Math.cos(ang) * 70, x2 = 200 - Math.cos(ang) * 70;
+                  const isVar = i === 11;
+                  return (
+                    <g>
+                      <line x1={x1} y1={y} x2={x2} y2={y} stroke={isVar ? 'var(--color-data-warn)' : 'var(--color-line-strong)'} stroke-opacity={isVar ? 1 : 0.7} />
+                      <circle cx={x1} cy={y} r={isVar ? 5 : 3.2} fill={isVar ? 'var(--color-data-warn)' : 'var(--color-accent)'} />
+                      <circle cx={x2} cy={y} r={isVar ? 5 : 3.2} fill={isVar ? 'var(--color-data-warn)' : 'var(--color-ink-2)'} />
+                    </g>
+                  );
+                })}
+              </g>
+            </svg>
+            <!-- WebGL mount -->
+            <div id="dna-canvas" class="absolute inset-0 opacity-0 transition-opacity duration-500" aria-hidden="true"></div>
+            <!-- Stage readout (works in both modes) -->
+            <div class="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 border-t border-line-faint bg-bg/80 p-4 backdrop-blur-sm">
+              <div>
+                <p class="label text-ink-muted">Stage</p>
+                <p id="dna-stage-label" class="mt-1 font-mono text-meta text-accent-text" aria-live="polite">01 · Biological data</p>
+              </div>
+              <ol class="flex gap-1.5" aria-hidden="true">
+                {backbone.map((s, i) => <li class="h-1 w-6 rounded-full bg-line-strong data-[on=true]:bg-accent" data-idx={i} data-on={i === 0 ? 'true' : 'false'}></li>)}
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Steps -->
+      <ol class="order-2 flex flex-col lg:order-1 lg:col-span-6" aria-label="The five stages">
+        {steps.map((st, i) => {
+          const stage = backbone.find((b) => b.id === st.stage)!;
+          return (
+            <li class="dna-step flex flex-col gap-3 border-t border-line py-7 first:border-t-0 lg:min-h-[34vh] lg:justify-center lg:py-8" data-step={i} data-stage={st.stage}>
+              <p class="label flex items-center gap-3 text-accent-text"><span class="text-ink-muted">{stage.index}</span>{stage.title}</p>
+              <h3 class="text-h3 text-ink">{st.title}</h3>
+              <p class="max-w-prose text-body text-ink-2">{st.body}</p>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { backbone } from '@/data/site';
+
+  type Handle = { setProgress(t: number): void; dispose(): void; readonly disposed: boolean };
+
+  const root = document.getElementById('dna-narrative');
+  const stage = document.getElementById('dna-stage');
+  const mount = document.getElementById('dna-canvas');
+  const fallback = document.getElementById('dna-fallback');
+  const label = document.getElementById('dna-stage-label');
+  const steps = Array.from(document.querySelectorAll<HTMLElement>('.dna-step'));
+  const dots = Array.from(stage?.querySelectorAll<HTMLElement>('[data-idx]') ?? []);
+
+  if (root && stage && mount && fallback && label && steps.length) {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    const lowPower = (nav.deviceMemory !== undefined && nav.deviceMemory <= 2) || (navigator.hardwareConcurrency || 4) <= 2;
+    const webgl = (() => {
+      try {
+        const c = document.createElement('canvas');
+        return !!(c.getContext('webgl2') || c.getContext('webgl'));
+      } catch { return false; }
+    })();
+
+    let handle: Handle | null = null;
+    let loading = false;
+    let inView = false;
+    let raf = 0;
+
+    // Progress across the five steps, from the viewport centre. 0..4.
+    const progress = () => {
+      const centre = window.innerHeight * 0.55;
+      const first = steps[0].getBoundingClientRect();
+      const last = steps[steps.length - 1].getBoundingClientRect();
+      const c0 = first.top + first.height / 2, c1 = last.top + last.height / 2;
+      if (c1 === c0) return 0;
+      return Math.max(0, Math.min(steps.length - 1, ((centre - c0) / (c1 - c0)) * (steps.length - 1)));
+    };
+
+    const paint = (t: number) => {
+      const idx = Math.round(t);
+      const s = backbone[idx];
+      if (stage.dataset.state !== String(idx)) {
+        stage.dataset.state = String(idx);
+        label.textContent = `${s.index} · ${s.title}`;
+        dots.forEach((d, i) => (d.dataset.on = String(i <= idx)));
+        steps.forEach((el, i) => el.classList.toggle('is-active', i === idx));
+      }
+      handle?.setProgress(reducedMotion ? idx : t);
+    };
+
+    const onScroll = () => {
+      if (!inView) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => paint(progress()));
+    };
+
+    const load = async () => {
+      if (handle || loading || !webgl) return;
+      loading = true;
+      try {
+        const { createDnaScene } = await import('./dna-scene');
+        const css = getComputedStyle(document.documentElement);
+        const v = (n: string) => css.getPropertyValue(n).trim();
+        handle = createDnaScene(mount, {
+          reducedMotion,
+          lowPower,
+          colors: {
+            accent: v('--color-accent'), accentText: v('--color-accent-text'), ink: v('--color-ink'), ink2: v('--color-ink-2'),
+            muted: v('--color-ink-muted'), warn: v('--color-data-warn'), critical: v('--color-data-critical'),
+          },
+        });
+        stage.dataset.mode = 'webgl';
+        mount.style.opacity = '1';
+        fallback.style.opacity = '0';
+        fallback.setAttribute('aria-hidden', 'true');
+        paint(progress());
+      } catch (err) {
+        // Stay on the static fallback; nothing else to do.
+        console.warn('[geper] DNA scene unavailable, using static fallback', err);
+        stage.dataset.mode = 'fallback';
+      } finally {
+        loading = false;
+      }
+    };
+
+    const dispose = () => {
+      handle?.dispose();
+      handle = null;
+      stage.dataset.mode = 'fallback';
+      mount.style.opacity = '0';
+      fallback.style.opacity = '1';
+      fallback.removeAttribute('aria-hidden');
+    };
+
+    // Lazy-load when the section approaches; pause updates when it leaves.
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          inView = e.isIntersecting;
+          if (inView) { void load(); onScroll(); }
+        }
+      },
+      { rootMargin: '40% 0px 40% 0px' },
+    );
+    io.observe(root);
+
+    document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(raf); else onScroll(); });
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    window.addEventListener('pagehide', dispose);
+
+    // Initial paint of the fallback state, whether or not WebGL ever loads.
+    paint(progress());
+
+    // Test/debug hook (no behaviour depends on it).
+    (window as unknown as { __geperDna: unknown }).__geperDna = {
+      get mode() { return stage.dataset.mode; },
+      get disposed() { return handle ? handle.disposed : null; },
+      get webgl() { return webgl; },
+      load, dispose,
+    };
+  }
+</script>
+
+<style>
+  /* Darker grid inside the stage only: the site-wide .pattern-grid is tuned for
+     large background areas and reads as almost nothing at this panel's size.
+     The shared token is left alone so the rest of the site is unaffected. */
+  #dna-stage.pattern-grid {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.24) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.24) 1px, transparent 1px);
+  }
+
+  .dna-step { transition: opacity 200ms; }
+  @media (min-width: 1024px) {
+    .dna-step { opacity: 0.45; }
+    .dna-step.is-active { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dna-step { transition: none; }
+  }
+</style>

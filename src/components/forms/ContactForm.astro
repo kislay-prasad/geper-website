@@ -1,0 +1,246 @@
+---
+/**
+ * Contact form.
+ *  - PUBLIC_CONTACT_ENDPOINT set   → POST JSON, real loading / success / error states.
+ *  - PUBLIC_CONTACT_ENDPOINT empty → opens the visitor's email client (mailto) with the
+ *    drafted message. The submit label says so; the confirmation states what
+ *    happened. No simulated success anywhere.
+ * See README "Contact endpoint contract" for the request/response shape.
+ */
+import { contact } from '@/data/content';
+import { site } from '@/data/site';
+import Button from '@/components/ui/Button.astro';
+import Icon from '@/components/ui/Icon.astro';
+const endpoint = site.contactEndpoint;
+const mode = endpoint ? 'endpoint' : 'mailto';
+const field = 'w-full rounded-md border border-line-strong bg-bg px-4 py-3 font-mono text-meta text-ink placeholder:text-ink-faint focus:border-accent-text focus:outline-none aria-[invalid=true]:border-data-critical';
+const lab = 'label text-ink-2';
+---
+<form id="contact-form" class="flex flex-col gap-6" novalidate data-mode={mode} data-endpoint={endpoint} data-email={site.contactEmail}>
+  <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+    <div class="flex flex-col gap-2">
+      <label for="name" class={lab}>Full name</label>
+      <input id="name" name="name" type="text" autocomplete="name" required maxlength="120" class={field} placeholder="Your name" aria-describedby="err-name" />
+      <p id="err-name" class="hidden text-body-sm text-data-critical" data-error></p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="email" class={lab}>Email address</label>
+      <input id="email" name="email" type="email" autocomplete="email" required maxlength="200" class={field} placeholder="you@organisation.org" aria-describedby="err-email" />
+      <p id="err-email" class="hidden text-body-sm text-data-critical" data-error></p>
+    </div>
+  </div>
+
+  <div class="flex flex-col gap-2">
+    <label for="organization" class={lab}>Organisation <span class="normal-case tracking-normal text-ink-muted">(optional)</span></label>
+    <input id="organization" name="organization" type="text" autocomplete="organization" maxlength="200" class={field} placeholder="Company, institution or lab" />
+  </div>
+
+  <div class="flex flex-col gap-2">
+    <label for="inquiryType" class={lab}>Nature of enquiry</label>
+    <div class="relative">
+      <select id="inquiryType" name="inquiryType" required class={`${field} appearance-none pr-10`} aria-describedby="err-inquiryType">
+        <option value="">Select one…</option>
+        {contact.categories.map((c) => <option value={c.value}>{c.label}</option>)}
+      </select>
+      <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted" aria-hidden="true">▾</span>
+    </div>
+    <p id="err-inquiryType" class="hidden text-body-sm text-data-critical" data-error></p>
+  </div>
+
+  <div class="flex flex-col gap-2">
+    <label for="message" class={lab}>Message</label>
+    <textarea id="message" name="message" required rows="6" minlength="20" maxlength="4000" class={`${field} min-h-36 resize-y`} placeholder="What would you like to discuss?" aria-describedby="err-message hint-message"></textarea>
+    <div class="flex justify-between gap-4">
+      <p id="err-message" class="hidden text-body-sm text-data-critical" data-error></p>
+      <p id="hint-message" class="ml-auto font-mono text-meta text-ink-muted"><span data-count>0</span> / 4000</p>
+    </div>
+  </div>
+
+  <!-- Honeypot: hidden from people, filled by bots. -->
+  <div class="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
+    <label for="website">Website</label>
+    <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
+  </div>
+
+  <div class="flex flex-col gap-4 border-t border-line-faint pt-6 md:flex-row md:items-center md:justify-end">
+    <Button type="submit" icon="arrow-right" id="contact-submit">{mode === 'mailto' ? 'Open in email' : 'Send Message'}</Button>
+  </div>
+
+  <!-- Status region -->
+  <div id="form-status" class="hidden rounded-md border p-4 text-body-sm" role="status" aria-live="polite">
+    <div class="flex items-start gap-3">
+      <span data-icon-ok class="hidden text-accent-text"><Icon name="check" size={18} /></span>
+      <span data-icon-err class="hidden text-data-critical"><Icon name="alert" size={18} /></span>
+      <div class="flex-1">
+        <p data-status-text class="text-ink"></p>
+        <p data-status-fallback class="mt-2 hidden">
+          <a data-fallback-link href="#" class="inline-flex items-center gap-1 text-accent-text underline underline-offset-4"><span data-fallback-text>Send it by email instead</span><span data-fallback-arrow class="hidden"><Icon name="arrow-right" size={14} /></span><span data-fallback-ext><Icon name="external" size={14} /></span></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script>
+  const form = document.getElementById('contact-form') as HTMLFormElement | null;
+  if (form) {
+    const mode = form.dataset.mode as 'endpoint' | 'mailto';
+    const endpoint = form.dataset.endpoint || '';
+    const email = form.dataset.email || '';
+    const submit = form.querySelector<HTMLButtonElement>('#contact-submit')!;
+    const submitLabel = submit.innerHTML;
+    const status = form.querySelector<HTMLElement>('#form-status')!;
+    const statusText = status.querySelector<HTMLElement>('[data-status-text]')!;
+    const statusFallback = status.querySelector<HTMLElement>('[data-status-fallback]')!;
+    const fallbackLink = status.querySelector<HTMLAnchorElement>('[data-fallback-link]')!;
+    const fallbackText = fallbackLink.querySelector<HTMLElement>('[data-fallback-text]')!;
+    const fallbackArrow = fallbackLink.querySelector<HTMLElement>('[data-fallback-arrow]')!;
+    const fallbackExt = fallbackLink.querySelector<HTMLElement>('[data-fallback-ext]')!;
+    /* Same link, two jobs: a way back to a draft that opened, or a way out
+       when sending failed. */
+    const setFallback = (text: string, arrow: boolean) => {
+      fallbackText.textContent = text;
+      fallbackArrow.classList.toggle('hidden', !arrow);
+      fallbackExt.classList.toggle('hidden', arrow);
+    };
+    const iconOk = status.querySelector<HTMLElement>('[data-icon-ok]')!;
+    const iconErr = status.querySelector<HTMLElement>('[data-icon-err]')!;
+    const message = form.querySelector<HTMLTextAreaElement>('#message')!;
+    const count = form.querySelector<HTMLElement>('[data-count]')!;
+
+    message.addEventListener('input', () => (count.textContent = String(message.value.length)));
+
+    type Field = 'name' | 'email' | 'inquiryType' | 'message';
+    const fields: Field[] = ['name', 'email', 'inquiryType', 'message'];
+    const el = (n: Field) => form.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(`#${n}`)!;
+    const err = (n: Field) => form.querySelector<HTMLElement>(`#err-${n}`)!;
+
+    const validate = (): Partial<Record<Field, string>> => {
+      const e: Partial<Record<Field, string>> = {};
+      const name = el('name').value.trim();
+      const em = el('email').value.trim();
+      const type = el('inquiryType').value;
+      const msg = el('message').value.trim();
+      if (!name) e.name = 'Enter your name.';
+      if (!em) e.email = 'Enter your email address.';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) e.email = 'Enter a valid email address, like name@organisation.org.';
+      if (!type) e.inquiryType = 'Choose what your enquiry is about.';
+      if (!msg) e.message = 'Write a message.';
+      else if (msg.length < 20) e.message = 'Add a little more detail: at least 20 characters.';
+      return e;
+    };
+
+    const showErrors = (e: Partial<Record<Field, string>>) => {
+      let first: Field | null = null;
+      for (const f of fields) {
+        const has = !!e[f];
+        el(f).setAttribute('aria-invalid', String(has));
+        err(f).textContent = e[f] ?? '';
+        err(f).classList.toggle('hidden', !has);
+        if (has && !first) first = f;
+      }
+      if (first) el(first).focus();
+      return !first;
+    };
+    fields.forEach((f) => el(f).addEventListener('input', () => { if (el(f).getAttribute('aria-invalid') === 'true') showErrors({ ...validate(), ...(validate()[f] ? {} : { [f]: undefined }) }); }));
+
+    const setStatus = (kind: 'ok' | 'err' | 'none', text = '', withFallback = false) => {
+      status.classList.toggle('hidden', kind === 'none');
+      status.className = status.className.replace(/border-(accent|data-critical)\S*/g, '').trim();
+      if (kind !== 'none') status.classList.add(kind === 'ok' ? 'border-accent/50' : 'border-data-critical/60');
+      iconOk.classList.toggle('hidden', kind !== 'ok');
+      iconErr.classList.toggle('hidden', kind !== 'err');
+      statusText.textContent = text;
+      statusFallback.classList.toggle('hidden', !withFallback);
+      if (kind !== 'none') status.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
+
+    /* One id per attempt; the server passes it to Resend as an idempotency key so a
+       retry or double-click of the same message cannot email twice. Renewed after success. */
+    let submissionId = crypto.randomUUID();
+    let inFlight = false;
+
+    const payload = () => ({
+      name: el('name').value.trim(),
+      email: el('email').value.trim(),
+      organization: (form.querySelector<HTMLInputElement>('#organization')!.value || '').trim() || undefined,
+      inquiryType: el('inquiryType').value,
+      message: el('message').value.trim(),
+      website: (form.querySelector<HTMLInputElement>('#website')!.value || ''),
+      submittedAt: new Date().toISOString(),
+      submissionId,
+    });
+
+    const mailtoHref = () => {
+      const p = payload();
+      const typeLabel = (el('inquiryType') as HTMLSelectElement).selectedOptions[0]?.text || p.inquiryType;
+      const subject = `[GEPER] ${typeLabel} — ${p.name}`;
+      const body = `${p.message}\n\n—\n${p.name}${p.organization ? `\n${p.organization}` : ''}\n${p.email}`;
+      return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    };
+
+    const setBusy = (busy: boolean) => {
+      submit.disabled = busy;
+      submit.setAttribute('aria-busy', String(busy));
+      submit.innerHTML = busy ? 'Sending…' : submitLabel;
+    };
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      setStatus('none');
+      if (!showErrors(validate())) return;
+      if (payload().website) return; // honeypot filled: bot submission, send nothing, show nothing
+
+      if (mode === 'mailto') {
+        const href = mailtoHref();
+        window.location.href = href;
+        fallbackLink.href = href;
+        setFallback('Open the email again', true);
+        setStatus('ok', `Your email client should now be open with your message addressed to ${email}.`, true);
+        return;
+      }
+
+      if (inFlight) return;
+      inFlight = true;
+      setBusy(true);
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 15000);
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(payload()),
+          signal: ctrl.signal,
+        });
+        if (res.status === 202 || res.status === 200) {
+          const data = await res.json().catch(() => ({}));
+          form.reset(); count.textContent = '0'; submissionId = crypto.randomUUID();
+          setStatus('ok', `Message sent${data?.id ? ` (reference ${data.id})` : ''}.`);
+        } else if (res.status === 400) {
+          const data = await res.json().catch(() => ({}));
+          const errs = (data && data.errors) || {};
+          if (Object.keys(errs).length) showErrors(errs);
+          setStatus('err', 'Some details need correcting. Check the highlighted fields.');
+        } else if (res.status === 429) {
+          fallbackLink.href = mailtoHref();
+          setFallback('Send it by email instead', false);
+          setStatus('err', 'Too many messages were sent recently. Please try again in a few minutes.', true);
+        } else {
+          fallbackLink.href = mailtoHref();
+          setFallback('Send it by email instead', false);
+          setStatus('err', res.status >= 500
+            ? 'The message could not be sent because the mail service is unavailable. Please try again shortly.'
+            : `The message could not be sent (server responded ${res.status}).`, true);
+        }
+      } catch (e) {
+        fallbackLink.href = mailtoHref();
+        setFallback('Send it by email instead', false);
+        setStatus('err', (e as Error).name === 'AbortError' ? 'The request timed out. Check your connection and try again.' : 'The message could not be sent. Check your connection and try again.', true);
+      } finally {
+        clearTimeout(timer);
+        inFlight = false;
+        setBusy(false);
+      }
+    });
+  }
+</script>

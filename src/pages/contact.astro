@@ -1,0 +1,39 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { contact } from '@/data/content';
+import SectionHeader from '@/components/ui/SectionHeader.astro';
+import ContactForm from '@/components/forms/ContactForm.astro';
+---
+<BaseLayout title="Contact" description="Get in touch with GEPER about research collaboration, the platform, data partnerships or press.">
+  <section class="relative" aria-labelledby="contact-title">
+    <div class="contact-grid pointer-events-none absolute inset-0 pattern-grid pattern-fade-y opacity-60" aria-hidden="true"></div>
+    <div class="container-page relative grid grid-cols-1 gap-8 py-8 md:py-10 lg:grid-cols-12 lg:items-center lg:gap-12 lg:py-12">
+      <div class="lg:col-span-5">
+        <SectionHeader level="h1" eyebrow={contact.eyebrow} title={contact.headline} lead={contact.lead} />
+      </div>
+      <div class="lg:col-span-7">
+        <div class="rounded-lg border border-line bg-bg-elevated p-6 lg:p-8">
+          <ContactForm />
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  // Preselect the enquiry type from ?topic= (used by "Request a technical discussion").
+  const topic = new URLSearchParams(location.search).get('topic');
+  const sel = document.getElementById('inquiryType') as HTMLSelectElement | null;
+  if (topic && sel && Array.from(sel.options).some((o) => o.value === topic)) sel.value = topic;
+</script>
+
+<style>
+  /* Darker background grid. The layer renders at 60% opacity, so the shared
+     .pattern-grid value lands near-invisible here; raised locally to match the
+     other page backgrounds. The site-wide token is unchanged. */
+  .contact-grid.pattern-grid {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px);
+  }
+</style>

@@ -1,0 +1,20 @@
+---
+import Card from './Card.astro';
+import StatusBadge from '@/components/ui/StatusBadge.astro';
+import type { Status } from '@/data/site';
+interface Props { index?: string; title: string; body: string; status?: Status; href?: string; items?: readonly string[] }
+const { index, title, body, status, href, items } = Astro.props;
+---
+<Card as="li" class="flex h-full flex-col gap-4">
+  <div class="flex items-start justify-between gap-4">
+    {index && <span class="label text-ink-muted">{index}</span>}
+    {status && <StatusBadge status={status} />}
+  </div>
+  <h3 class="text-h3 text-ink">{href ? <a href={href} class="hover:text-accent-text">{title}</a> : title}</h3>
+  <p class="text-body-sm text-ink-2">{body}</p>
+  {items && items.length > 0 && (
+    <ul class="mt-auto flex flex-col gap-2 border-t border-line-faint pt-4">
+      {items.map((it) => <li class="text-body-sm text-ink-2">{it}</li>)}
+    </ul>
+  )}
+</Card>

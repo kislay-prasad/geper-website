@@ -1,0 +1,231 @@
+---
+/**
+ * About hero. The oversized, faint INTELLIGENCE wordmark stays — it is the
+ * page's identity — and gains a pixel layer rather than a replacement.
+ *
+ *   · a sparse field of pixels sits within and around the type
+ *   · a handful detach, drift, and reform on long individual cycles
+ *   · the whole layer parallaxes slowly against the copy on scroll
+ *
+ * Copy introduces the company. Nothing here explains the technology.
+ */
+import { about } from '@/data/content';
+import Eyebrow from '@/components/ui/Eyebrow.astro';
+import { rnd, srnd, round } from './pixels';
+
+/* Pixels are laid out in the wordmark's own box (0–100 × 0–100), denser along
+   the optical band of the type than above or below it. */
+const N = 46;
+const pixels = Array.from({ length: N }, (_, i) => {
+  const band = rnd(i, 3) < 0.72;
+  return {
+    x: round(rnd(i, 1) * 100),
+    y: round(band ? 34 + rnd(i, 2) * 36 : rnd(i, 2) * 100),
+    s: round(0.35 + rnd(i, 4) * 0.5),
+    /* Only some pixels detach; the rest just breathe. */
+    drift: rnd(i, 5) < 0.34,
+    dx: round(srnd(i, 6) * 5.5),
+    dy: round(srnd(i, 7) * 3.2),
+    dur: round(14 + rnd(i, 8) * 12, 1),
+    delay: round(rnd(i, 9) * -26, 1),
+    accent: i % 13 === 4,
+  };
+});
+---
+<section class="ah relative overflow-hidden bg-bg" aria-labelledby="about-title">
+  <div class="ah-grid pointer-events-none absolute inset-0 pattern-grid pattern-fade-y opacity-60" aria-hidden="true"></div>
+
+  <div class="container-page relative py-14 md:py-18 lg:py-20">
+    <!-- Wordmark + pixel layer share one box so the pixels track the type. -->
+    <div class="ah-mark" aria-hidden="true">
+      <p class="ah-word" data-text="INTELLIGENCE">INTELLIGENCE</p>
+      <div class="ah-px">
+        {pixels.map((p) => (
+          <span
+            class:list={['ah-dot', p.drift && 'is-drift', p.accent && 'is-accent']}
+            style={`left:${p.x}%;top:${p.y}%;--s:${p.s};--dx:${p.dx}%;--dy:${p.dy}%;--dur:${p.dur}s;--delay:${p.delay}s`}
+          ></span>
+        ))}
+      </div>
+    </div>
+
+    <div class="ah-copy relative max-w-3xl">
+      <Eyebrow>{about.eyebrow}</Eyebrow>
+      <h1 id="about-title" class="mt-4 text-display text-ink">{about.headline}</h1>
+      <p class="mt-5 max-w-prose text-body-lg text-ink-2">{about.lead}</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  /* Parallax: one rAF-throttled read, written to a custom property. The word
+     and the pixels move at slightly different rates, which is what gives the
+     layer depth without anything appearing to animate. */
+  const hero = document.querySelector<HTMLElement>('.ah');
+  if (hero && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    let queued = false;
+    const update = () => {
+      queued = false;
+      const r = hero.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > innerHeight) return;
+      /* 0 at the top of the page, 1 once the hero has scrolled fully past. */
+      const p = Math.min(1, Math.max(0, -r.top / Math.max(1, r.height)));
+      hero.style.setProperty('--par', p.toFixed(4));
+    };
+    const onScroll = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(update);
+    };
+    addEventListener('scroll', onScroll, { passive: true });
+    addEventListener('resize', onScroll, { passive: true });
+    update();
+  }
+</script>
+
+<style>
+  .ah { --par: 0; }
+
+  /* Darker background grid. The layer renders at 60% opacity, so the shared
+     .pattern-grid value lands near-invisible here. Raised locally only. */
+  .ah-grid.pattern-grid {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px);
+  }
+
+  .ah-mark {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 8%;
+    height: 62%;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .ah-word {
+    position: absolute;
+    left: 1.25rem;
+    top: 0;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 18vw;
+    line-height: 1;
+    letter-spacing: -0.05em;
+    color: color-mix(in srgb, var(--color-ink) 8.5%, transparent);
+    transform: translate3d(0, calc(var(--par) * -26px), 0);
+    will-change: transform;
+  }
+  @media (min-width: 1024px) {
+    .ah-word { font-size: 11rem; }
+  }
+
+  /* Glitch wave. Two offset copies of the word are drawn from data-text, each
+     showing only a narrow horizontal band. The band travels top-to-bottom —
+     that descent is the wave — while the copy jumps sideways on every step, so
+     the displacement reads as signal corruption rather than as motion. The
+     burst occupies the first fifth of the cycle; the rest is quiet, which is
+     what stops it looking like a loop. steps(1) keeps every jump instant. */
+  .ah-word::before,
+  .ah-word::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    animation-duration: 7.2s;
+    animation-iteration-count: infinite;
+    animation-timing-function: steps(1, end);
+  }
+  .ah-word::before {
+    color: color-mix(in srgb, var(--color-accent) 11%, transparent);
+    animation-name: ah-glitch-a;
+  }
+  .ah-word::after {
+    color: color-mix(in srgb, var(--color-fig-coral) 10%, transparent);
+    animation-name: ah-glitch-b;
+    animation-delay: 0.09s;
+  }
+
+  @keyframes ah-glitch-a {
+    0%, 100% { opacity: 0; clip-path: inset(0 0 100% 0); transform: translate3d(0, 0, 0); }
+    1%  { opacity: 1; clip-path: inset(2% 0 86% 0);  transform: translate3d(-0.9%, 0, 0); }
+    4%  { opacity: 1; clip-path: inset(20% 0 68% 0); transform: translate3d(0.7%, 0, 0); }
+    7%  { opacity: 1; clip-path: inset(39% 0 49% 0); transform: translate3d(-0.55%, 0, 0); }
+    10% { opacity: 1; clip-path: inset(57% 0 31% 0); transform: translate3d(0.85%, 0, 0); }
+    13% { opacity: 1; clip-path: inset(75% 0 13% 0); transform: translate3d(-0.4%, 0, 0); }
+    16% { opacity: 1; clip-path: inset(89% 0 3% 0);  transform: translate3d(0.5%, 0, 0); }
+    18%, 99% { opacity: 0; }
+  }
+  /* The second copy trails the first and leans the other way, which is what
+     produces the split fringe as the band passes. */
+  @keyframes ah-glitch-b {
+    0%, 100% { opacity: 0; clip-path: inset(0 0 100% 0); transform: translate3d(0, 0, 0); }
+    1%  { opacity: 1; clip-path: inset(4% 0 84% 0);  transform: translate3d(1%, 0, 0); }
+    4%  { opacity: 1; clip-path: inset(22% 0 66% 0); transform: translate3d(-0.8%, 0, 0); }
+    7%  { opacity: 1; clip-path: inset(41% 0 47% 0); transform: translate3d(0.6%, 0, 0); }
+    10% { opacity: 1; clip-path: inset(59% 0 29% 0); transform: translate3d(-0.9%, 0, 0); }
+    13% { opacity: 1; clip-path: inset(77% 0 11% 0); transform: translate3d(0.45%, 0, 0); }
+    16% { opacity: 1; clip-path: inset(91% 0 1% 0);  transform: translate3d(-0.6%, 0, 0); }
+    18%, 99% { opacity: 0; }
+  }
+
+  /* The pixel layer rides the same box but moves further, so the two planes
+     separate slightly as the page scrolls. */
+  .ah-px {
+    position: absolute;
+    inset: 0;
+    transform: translate3d(0, calc(var(--par) * -58px), 0);
+    will-change: transform;
+  }
+
+  .ah-dot {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: var(--color-fig-mid);
+    opacity: 0.55;
+    transform: scale(var(--s));
+    animation: ah-breathe var(--dur) ease-in-out infinite;
+    animation-delay: var(--delay);
+  }
+  .ah-dot.is-accent {
+    background: var(--color-accent-text);
+    opacity: 0.32;
+  }
+
+  /* Detach, hold, and reform. The long hold is what keeps it from reading as
+     a loop. */
+  .ah-dot.is-drift {
+    animation-name: ah-drift;
+  }
+
+  @keyframes ah-breathe {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 0.72; }
+  }
+  @keyframes ah-drift {
+    0%, 8% { transform: translate(0, 0) scale(var(--s)); opacity: 0.5; }
+    38%, 62% { transform: translate(var(--dx), var(--dy)) scale(calc(var(--s) * 0.8)); opacity: 0.14; }
+    92%, 100% { transform: translate(0, 0) scale(var(--s)); opacity: 0.5; }
+  }
+
+  .ah-copy {
+    opacity: 0;
+    transform: translateY(16px);
+    animation: ah-enter 820ms var(--ease-out-quart) forwards;
+  }
+  @keyframes ah-enter { to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ah-word, .ah-px { transform: none; }
+    .ah-word::before, .ah-word::after { animation: none; opacity: 0; }
+    /* Specificity has to match .ah-dot.is-drift, or the drift keeps running. */
+    .ah-dot,
+    .ah-dot.is-drift { animation: none; opacity: 0.4; }
+    .ah-dot.is-accent { opacity: 0.3; }
+    .ah-copy { opacity: 1; transform: none; animation: none; }
+  }
+</style>

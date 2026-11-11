@@ -1,0 +1,23 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ResearchHero from '@/components/research/ResearchHero.astro';
+import ResearchPipeline from '@/components/research/ResearchPipeline.astro';
+import ResearchDirections from '@/components/research/ResearchDirections.astro';
+import NextStep from '@/components/sections/NextStep.astro';
+---
+<BaseLayout
+  title="Research"
+  description="Research at GEPER: how biological variation can be represented, modelled and interpreted computationally, across four active directions."
+>
+  <ResearchHero />
+  <ResearchPipeline />
+  <ResearchDirections />
+
+  <NextStep
+    label="Next"
+    title="Research becomes useful when it can be built."
+    body="These research directions inform the architecture of the GEPER platform and the systems being developed on top of it."
+    href="/platform"
+    cta="Explore the Platform"
+  />
+</BaseLayout>

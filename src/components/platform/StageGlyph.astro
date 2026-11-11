@@ -1,0 +1,124 @@
+---
+/**
+ * Small schematic marks for the five system stages. Glyph-scale, not
+ * diagram-scale: four to nine elements each, readable at 96×56.
+ *
+ * Colour: greys carry the structure, warm amber marks the biological material
+ * itself, and accent blue is reserved for the stage currently being read
+ * (applied from the parent via `.is-current`).
+ */
+import { backbone } from '@/data/site';
+interface Props { stage: (typeof backbone)[number]['id'] }
+const { stage } = Astro.props;
+
+const bars = [10, 16, 8, 20, 13, 22, 9, 17, 11];
+const cells = [0, 1, 2].flatMap((r) => [0, 1, 2].map((c) => ({ r, c, absent: r === 1 && c === 2 })));
+const layerA = [12, 28, 44];
+const layerB = [20, 36];
+const streams = [12, 28, 44];
+---
+<svg viewBox="0 0 96 56" class="gl" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
+  {stage === 'data' && (
+    <g>
+      {bars.map((h, i) => (
+        <rect x={10 + i * 8.5} y={40 - h} width="4" height={h} rx="0.8"
+          class={i === 5 ? 'gl-bar gl-bar--mark' : 'gl-bar'} style={`--d:${(i * 0.05).toFixed(2)}s`} />
+      ))}
+      <line x1="6" y1="44" x2="90" y2="44" class="gl-base" />
+    </g>
+  )}
+
+  {stage === 'representation' && (
+    <g>
+      {cells.map((c, i) => (
+        <rect x={26 + c.c * 16} y={12 + c.r * 16} width="11" height="11" rx="1.5"
+          class={c.absent ? 'gl-cell gl-cell--absent' : 'gl-cell'} style={`--d:${(i * 0.04).toFixed(2)}s`} />
+      ))}
+    </g>
+  )}
+
+  {stage === 'models' && (
+    <g>
+      {layerA.flatMap((y1) => layerB.map((y2) => (
+        <path d={`M30 ${y1} C 42 ${y1}, 50 ${y2}, 64 ${y2}`} class="gl-edge" />
+      )))}
+      {layerA.map((y, i) => <circle cx="30" cy={y} r="3.4" class="gl-node" style={`--d:${(i * 0.06).toFixed(2)}s`} />)}
+      {layerB.map((y, i) => <circle cx="64" cy={y} r="3.4" class="gl-node" style={`--d:${(0.2 + i * 0.06).toFixed(2)}s`} />)}
+    </g>
+  )}
+
+  {stage === 'interpretation' && (
+    <g>
+      {streams.map((y, i) => (
+        <path d={`M16 ${y} C 40 ${y}, 44 28, 62 28`} class="gl-stream" style={`--d:${(i * 0.08).toFixed(2)}s`} />
+      ))}
+      <circle cx="68" cy="28" r="5.5" class="gl-conv" />
+    </g>
+  )}
+
+  {stage === 'output' && (
+    <g>
+      <rect x="22" y="10" width="52" height="36" rx="2.5" class="gl-sheet" />
+      {[19, 26, 33].map((y, i) => (
+        <line x1="29" y1={y} x2={i === 1 ? 60 : 67} y2={y} class="gl-line" style={`--d:${(i * 0.07).toFixed(2)}s`} />
+      ))}
+      <rect x="29" y="38" width="16" height="3.5" rx="1" class="gl-mark" />
+    </g>
+  )}
+</svg>
+
+<style>
+  .gl { display: block; width: 100%; height: 100%; overflow: visible; }
+
+  /* Every element settles in when its stage is reached; nothing loops. */
+  .gl-bar, .gl-cell, .gl-node, .gl-line {
+    opacity: 0;
+    transition: opacity 620ms ease-out, transform 700ms var(--ease-out-quart), fill 620ms ease-out, stroke 620ms ease-out;
+    transition-delay: var(--d, 0s);
+  }
+
+  .gl-bar { fill: var(--color-fig-line); transform: translateY(4px); transform-box: fill-box; }
+  .gl-bar--mark { fill: var(--color-fig-warm); }
+  .gl-base { stroke: var(--color-line-faint); stroke-width: 1; }
+
+  .gl-cell { fill: var(--color-fig-line); transform: scale(0.7); transform-box: fill-box; transform-origin: center; }
+  .gl-cell--absent { fill: none; stroke: var(--color-ink-faint); stroke-width: 1; stroke-dasharray: 2 2; }
+
+  .gl-edge { fill: none; stroke: var(--color-line); stroke-width: 1; }
+  .gl-node { fill: var(--color-bg); stroke: var(--color-fig-mid); stroke-width: 1.2; }
+
+  .gl-stream {
+    fill: none;
+    stroke: var(--color-fig-mid);
+    stroke-width: 1.3;
+    opacity: 0.55;
+    stroke-dasharray: 90;
+    stroke-dashoffset: 90;
+    transition: stroke-dashoffset 900ms var(--ease-out-quart), stroke 620ms ease-out;
+    transition-delay: var(--d, 0s);
+  }
+  .gl-conv { fill: none; stroke: var(--color-fig-mid); stroke-width: 1.3; }
+
+  .gl-sheet { fill: none; stroke: var(--color-fig-line); stroke-width: 1; }
+  .gl-line { stroke: var(--color-fig-mid); stroke-width: 1.4; opacity: 0; }
+  .gl-mark { fill: var(--color-fig-warm); opacity: 0.75; }
+
+  /* --- reached: the stage has been passed ---------------------------- */
+  :global(.sp-stage.is-reached) .gl-bar,
+  :global(.sp-stage.is-reached) .gl-cell,
+  :global(.sp-stage.is-reached) .gl-node,
+  :global(.sp-stage.is-reached) .gl-line { opacity: 1; transform: none; }
+  :global(.sp-stage.is-reached) .gl-stream { stroke-dashoffset: 0; }
+
+  /* --- current: the one stage in the reading band --------------------- */
+  :global(.sp-stage.is-current) .gl-node { stroke: var(--color-fig-bright); }
+  :global(.sp-stage.is-current) .gl-conv { stroke: var(--color-accent-text); }
+  :global(.sp-stage.is-current) .gl-cell { fill: var(--color-fig-mid); }
+  :global(.sp-stage.is-current) .gl-bar { fill: var(--color-fig-mid); }
+  :global(.sp-stage.is-current) .gl-bar--mark { fill: var(--color-fig-warm); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gl-bar, .gl-cell, .gl-node, .gl-line { opacity: 1; transform: none; transition: none; }
+    .gl-stream { stroke-dashoffset: 0; transition: none; }
+  }
+</style>

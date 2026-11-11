@@ -1,0 +1,11 @@
+---
+/** Vertical rhythm wrapper. Alternates surface tone via `tone`. */
+interface Props { id?: string; tone?: 'bg' | 'elevated'; class?: string; labelledby?: string; pattern?: 'grid' | 'dots' | 'none' }
+const { id, tone = 'bg', class: className = '', labelledby, pattern = 'none' } = Astro.props;
+---
+<section id={id} aria-labelledby={labelledby} class={`relative ${tone === 'elevated' ? 'bg-bg-elevated border-y border-line-faint' : 'bg-bg'} ${className}`}>
+  {pattern !== 'none' && <div class={`pointer-events-none absolute inset-0 ${pattern === 'grid' ? 'pattern-grid' : 'pattern-dots'} pattern-fade-y opacity-70`} aria-hidden="true"></div>}
+  <div class="container-page relative py-10 md:py-12 lg:py-14">
+    <slot />
+  </div>
+</section>

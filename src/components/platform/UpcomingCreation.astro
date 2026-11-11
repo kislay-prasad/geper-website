@@ -1,0 +1,57 @@
+---
+/**
+ * Bij AI, stated once and briefly: what GEPER is building next, not something
+ * on offer. No description of how it works, no capabilities, no call to
+ * action — the Platform page explains the system, and this says what the first
+ * thing built on it will be.
+ */
+import { platform } from '@/data/content';
+import StatusBadge from '@/components/ui/StatusBadge.astro';
+import BijTerminal from './BijTerminal.astro';
+
+const P = platform.product;
+---
+<section class="uc-section relative bg-bg" aria-labelledby="upcoming-title">
+  <div class="container-page relative py-10 md:py-12 lg:py-14">
+    <div class="uc mx-auto max-w-2xl overflow-hidden rounded-lg border border-line bg-bg-elevated p-5 sm:p-6 lg:p-7">
+      <!-- Text first in the source and first on screen: the story is GEPER →
+           first creation → Bij AI → in development. The figure sits beside it
+           on wider viewports and beneath it on narrow ones, so it supports the
+           reading order rather than interrupting it. -->
+      <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-7">
+        <div class="min-w-0 sm:flex-1">
+          <p class="label text-ink-muted">GEPER’s first creation</p>
+          <div class="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h2 id="upcoming-title" class="uc-name text-h2 text-ink">{P.name}</h2>
+            <StatusBadge status={P.status} />
+          </div>
+          <p class="mt-3 max-w-prose text-body text-ink-2">{P.availabilityNote}</p>
+        </div>
+
+        <div class="uc-fig shrink-0 self-center">
+          <BijTerminal />
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .uc-name { letter-spacing: -0.025em; }
+
+  /* The figure is given a fixed measure rather than a share of the row, so the
+     copy keeps its own measure at every width and the figure never stretches.
+     Stacked below the copy it centres itself; alongside the copy it is centred
+     on the row's cross axis, so the two halves share one optical centre line. */
+  .uc-fig {
+    width: 100%;
+    max-width: 15rem;
+    margin-inline: auto;
+  }
+  @media (min-width: 640px) {
+    .uc-fig { width: 12.5rem; margin-inline: 0; }
+  }
+  @media (min-width: 1024px) {
+    .uc-fig { width: 14.5rem; }
+  }
+</style>

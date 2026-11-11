@@ -1,0 +1,10 @@
+---
+/** Technical label above a heading. Optional leading rule and index (e.g. "01 /"). */
+interface Props { index?: string; rule?: boolean; class?: string; tone?: 'accent' | 'muted' }
+const { index, rule = true, class: className = '', tone = 'accent' } = Astro.props;
+---
+<p class={`label flex items-center gap-3 ${tone === 'accent' ? 'text-accent-text' : 'text-ink-muted'} ${className}`}>
+  {rule && <span class="inline-block h-px w-8 bg-current opacity-70" aria-hidden="true"></span>}
+  {index && <span class="text-ink-muted">{index} /</span>}
+  <span><slot /></span>
+</p>

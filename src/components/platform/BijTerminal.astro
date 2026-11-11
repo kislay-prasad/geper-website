@@ -1,0 +1,400 @@
+---
+/**
+ * Bij AI — "coming to life" figure.
+ *
+ * A pixel CRT sitting on the left, computing. Sequence and code scroll behind
+ * its glass; every cycle a small double helix assembles inside the screen,
+ * leaves along a curved path, and dissolves back into loose pixels. Biological
+ * data goes in, computation happens, something emerges — stated as a machine
+ * still running, never as a product.
+ *
+ * Built the way every other figure here is: a geometry table resolved at build
+ * time so the markup is byte-stable, declarative SVG, CSS keyframes for the
+ * loops and SMIL `animateMotion` for the two curved departures. No canvas, no
+ * animation library, no runtime layout work, and about forty animated nodes in
+ * total rather than a particle system.
+ *
+ * Colour: structure is neutral throughout. The nucleotide set already
+ * established on the site appears only on four helix pixels and four sequence
+ * ticks — adenine blue, thymine coral, cytosine amber, guanine green — with
+ * accent blue reserved for the screen's own glow.
+ */
+
+/* ---- CRT geometry -------------------------------------------------------
+   The set is fixed rather than computed from props: this figure has one job
+   and one size, and a table is easier to read than arithmetic.
+
+   It is anchored to the lower-left corner on an even 6-unit margin, and the
+   glass takes as much of the case as a bezel allows: 8 units on three sides,
+   12 beneath for the vents and the power pip. */
+const TV = { x: 6, y: 44, w: 116, h: 86 };
+const SCREEN = { x: 14, y: 52, w: 100, h: 66 };
+
+/* Scanlines ride inside the screen's clip and scroll slowly downward. */
+const scanlines = Array.from({ length: 18 }, (_, i) => SCREEN.y + i * 4);
+
+/* Two columns of code behind the glass. Short fragments only — these should
+   read as data moving, never as text asking to be read. */
+const SCREEN_CODE = [
+  { x: 21, rows: ['ATCG', '0110', 'SEQ', 'ACGT', 'GENE', '1011'], dur: 13 },
+  { x: 70, rows: ['VAR', 'DATA', '1001', 'MODEL', 'ATCG', '0110'], dur: 17 },
+];
+
+/* A short sequence rule under the screen: four of the ticks carry a base
+   colour, the rest stay neutral so the bar never becomes a rainbow. */
+const TICK_TONE: Record<number, string> = { 1: 'is-a', 4: 'is-t', 7: 'is-c', 11: 'is-g' };
+const ticks = Array.from({ length: 14 }, (_, i) => ({
+  i,
+  x: 20 + i * 7,
+  tone: TICK_TONE[i] ?? '',
+}));
+
+/* ---- the helix that leaves -----------------------------------------------
+   Five rungs, two pixels each. `dx` is the direction each pixel drifts when
+   the structure dissolves, so the break-up is deterministic rather than a
+   random scatter that would differ between builds. */
+const HELIX_ROWS = 5;
+const helix = Array.from({ length: HELIX_ROWS }, (_, r) => {
+  const phase = (r * Math.PI) / (HELIX_ROWS - 1);
+  const spread = Math.cos(phase) * 5;
+  const y = r * 5;
+  return [
+    { r, y, x: +(spread).toFixed(2), dx: 1, tone: r === 0 ? 'is-a' : r === 3 ? 'is-c' : '' },
+    { r, y, x: +(-spread).toFixed(2), dx: -1, tone: r === 1 ? 'is-g' : r === 4 ? 'is-t' : '' },
+  ];
+}).flat();
+
+/* Rungs are drawn only where the strands are close enough to pair. */
+const rungs = [1, 2, 3].map((r) => ({ r, y: r * 5, w: Math.abs(Math.cos((r * Math.PI) / (HELIX_ROWS - 1)) * 10) }));
+
+/* The curved route out of the screen, and the shorter routes the code
+   fragments take. Every departure is a curve — nothing travels straight up. */
+const DNA_ROUTE = 'M 64 86 C 94 84, 118 66, 136 48 C 150 34, 162 26, 176 18';
+/* The fragments leave from the right edge of the glass rather than its middle,
+   so they never sit on top of the code already scrolling behind it. */
+const CODE_ROUTES = [
+  { d: 'M 108 76 C 128 68, 144 56, 156 42 C 163 33, 168 28, 172 24', text: 'ATCG', dur: 11, begin: -2 },
+  { d: 'M 110 92 C 132 88, 150 74, 162 58 C 169 49, 173 45, 176 42', text: '0110', dur: 13, begin: -7 },
+  { d: 'M 106 62 C 126 54, 142 42, 154 28 C 160 21, 164 17, 168 14', text: 'GENE', dur: 15, begin: -11 },
+];
+
+/* A few loose nucleotide pixels drifting near the route. Fixed positions. */
+const drifters = [
+  { x: 120, y: 44, tone: 'is-a', dur: 9, delay: -1 },
+  { x: 152, y: 34, tone: 'is-g', dur: 11, delay: -5 },
+  { x: 168, y: 52, tone: 'is-c', dur: 10, delay: -8 },
+  { x: 104, y: 30, tone: 'is-t', dur: 12, delay: -3 },
+];
+---
+<div class="bt" aria-hidden="true">
+  <svg class="bt-svg" viewBox="0 0 200 150" preserveAspectRatio="xMidYMid meet" focusable="false">
+    <defs>
+      <clipPath id="bij-screen">
+        <rect x={SCREEN.x} y={SCREEN.y} width={SCREEN.w} height={SCREEN.h} rx="2" />
+      </clipPath>
+    </defs>
+
+    <!-- Every drawn element lives in one stage group. The nudge centres the
+         composition optically inside the viewBox: without it the set sits low
+         and left, because the machine occupies the bottom-left while what
+         leaves it occupies the top-right. -->
+    <g class="bt-stage" transform="translate(3 -3)">
+
+    <!-- ============ the machine ============ -->
+    <g class="bt-set">
+      <rect class="bt-case" x={TV.x} y={TV.y} width={TV.w} height={TV.h} rx="3" />
+      <rect class="bt-screen" x={SCREEN.x} y={SCREEN.y} width={SCREEN.w} height={SCREEN.h} rx="2" />
+
+      <g clip-path="url(#bij-screen)">
+        <!-- glow: one soft plate behind the code, breathing slowly -->
+        <rect class="bt-glow" x={SCREEN.x} y={SCREEN.y} width={SCREEN.w} height={SCREEN.h} />
+
+        <!-- code scrolling behind the glass -->
+        {SCREEN_CODE.map((col, ci) => (
+          <g class="bt-code" style={`--dur:${col.dur}s;--d:${ci * -4}s`}>
+            {[...col.rows, ...col.rows].map((row, i) => (
+              <text class="bt-line" x={col.x} y={SCREEN.y + 10 + i * 11}>{row}</text>
+            ))}
+          </g>
+        ))}
+
+        <!-- scanlines -->
+        <g class="bt-scan">
+          {scanlines.map((y) => <line x1={SCREEN.x} y1={y} x2={SCREEN.x + SCREEN.w} y2={y} />)}
+        </g>
+
+        <!-- the helix assembling inside the tube, just before it leaves -->
+        <g class="bt-seed" transform="translate(62 74)">
+          {helix.map((p) => (
+            <rect class:list={['bt-px', p.tone]} x={p.x} y={p.y} width="2.6" height="2.6" rx="0.4"
+              style={`--d:${(p.r * 0.12).toFixed(2)}s`} />
+          ))}
+        </g>
+      </g>
+
+      <!-- bezel details: power pip and two vents. Fixed, understated. -->
+      <circle class="bt-pip" cx={TV.x + TV.w - 8} cy={TV.y + TV.h - 6} r="1.8" />
+      <line class="bt-vent" x1={TV.x + 8} y1={TV.y + TV.h - 8} x2={TV.x + 34} y2={TV.y + TV.h - 8} />
+      <line class="bt-vent" x1={TV.x + 8} y1={TV.y + TV.h - 4} x2={TV.x + 26} y2={TV.y + TV.h - 4} />
+
+      <!-- stand -->
+      <rect class="bt-neck" x={TV.x + TV.w / 2 - 7} y={TV.y + TV.h} width="14" height="5" rx="1" />
+      <rect class="bt-foot" x={TV.x + TV.w / 2 - 20} y={TV.y + TV.h + 5} width="40" height="3" rx="1.2" />
+    </g>
+
+    <!-- sequence rule beneath the set -->
+    <g class="bt-ticks">
+      {ticks.map((t) => (
+        <rect class:list={['bt-tick', t.tone, t.i > 9 && 'bt-tick--wide']}
+          x={t.x} y={TV.y + TV.h + 12} width="2.6" height="6" rx="0.5"
+          style={`--d:${(t.i * 0.14).toFixed(2)}s`} />
+      ))}
+    </g>
+
+    <!-- ============ what leaves the screen ============ -->
+    <path id="bij-dna-route" class="bt-route" d={DNA_ROUTE} />
+    {CODE_ROUTES.map((c, i) => <path id={`bij-code-${i}`} class="bt-route" d={c.d} />)}
+
+    <!-- the helix, travelling and coming apart -->
+    <g class="bt-dna">
+      <g class="bt-dna-body">
+        {rungs.map((r) => (
+          <line class="bt-rung" x1={-r.w / 2} y1={r.y + 1.3} x2={r.w / 2} y2={r.y + 1.3}
+            style={`--d:${(r.r * 0.1).toFixed(2)}s`} />
+        ))}
+        {helix.map((p) => (
+          <rect class:list={['bt-dpx', p.tone]} x={p.x - 1.3} y={p.y - 1.3} width="2.6" height="2.6" rx="0.4"
+            style={`--dx:${p.dx * (6 + p.r * 1.6)}px;--dy:${(p.r - 2) * 2.4}px;--d:${(p.r * 0.06).toFixed(2)}s`} />
+        ))}
+      </g>
+      <animateMotion dur="14s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;0.2;0.82;1" calcMode="linear">
+        <mpath href="#bij-dna-route" />
+      </animateMotion>
+    </g>
+
+    <!-- code fragments following it out -->
+    {CODE_ROUTES.map((c, i) => (
+      <g class:list={['bt-frag', i === 2 && 'bt-frag--extra']} style={`--dur:${c.dur}s;--fd:${c.begin}s`}>
+        <text class="bt-fragtext" x="0" y="0">{c.text}</text>
+        <animateMotion dur={`${c.dur}s`} begin={`${c.begin}s`} repeatCount="indefinite">
+          <mpath href={`#bij-code-${i}`} />
+        </animateMotion>
+      </g>
+    ))}
+
+    <!-- loose nucleotide pixels drifting near the route -->
+    {drifters.map((d, i) => (
+      <rect class:list={['bt-drift', d.tone, i > 1 && 'bt-drift--extra']}
+        x={d.x} y={d.y} width="2.2" height="2.2" rx="0.4"
+        style={`--dur:${d.dur}s;--d:${d.delay}s`} />
+    ))}
+    </g>
+  </svg>
+</div>
+
+<script>
+  /* SMIL is the one thing the reduced-motion media query cannot reach: the two
+     `animateMotion` departures keep running no matter what CSS says. Pausing
+     the document's animations leaves them parked at their start, which is the
+     static state the rest of the figure resolves to. */
+  const svg = document.querySelector<SVGSVGElement>('.bt-svg');
+  if (svg && matchMedia('(prefers-reduced-motion: reduce)').matches) svg.pauseAnimations();
+</script>
+
+<style>
+  /* An intentional bounding area. The figure is a fixed 4:3 box and the drawing
+     is clipped to it, so no element can wander outside the space reserved for
+     it and the block always occupies exactly the same footprint. */
+  .bt { width: 100%; }
+  .bt-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
+
+  /* ---- the set --------------------------------------------------------- */
+  .bt-case {
+    fill: var(--color-bg);
+    stroke: var(--color-fig-mid);
+    stroke-width: 1.2;
+  }
+  .bt-screen {
+    fill: var(--color-bg-elevated);
+    stroke: var(--color-line);
+    stroke-width: 0.8;
+  }
+  .bt-neck, .bt-foot { fill: none; stroke: var(--color-fig-mid); stroke-width: 1.1; }
+  .bt-vent { stroke: var(--color-fig-line); stroke-width: 1; opacity: 0.7; }
+  .bt-pip {
+    fill: var(--color-accent);
+    opacity: 0.5;
+    animation: bt-pip 4.5s ease-in-out infinite;
+  }
+  @keyframes bt-pip { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.8; } }
+
+  /* Screen glow: one plate, breathing. Not a light source. */
+  .bt-glow {
+    fill: var(--color-accent);
+    opacity: 0.05;
+    animation: bt-glow 7s ease-in-out infinite;
+  }
+  @keyframes bt-glow { 0%, 100% { opacity: 0.035; } 50% { opacity: 0.085; } }
+
+  /* ---- code behind the glass ------------------------------------------- */
+  .bt-line {
+    font-family: var(--font-mono);
+    font-size: 7px;
+    letter-spacing: 0.06em;
+    fill: var(--color-fig-mid);
+    opacity: 0.55;
+  }
+  /* Two identical row sets stacked, translated by exactly one set height, so
+     the loop has no seam. */
+  .bt-code {
+    animation: bt-scroll var(--dur) linear infinite;
+    animation-delay: var(--d);
+  }
+  @keyframes bt-scroll {
+    from { transform: translateY(0); }
+    to { transform: translateY(-66px); }
+  }
+
+  .bt-scan line {
+    stroke: var(--color-ink);
+    stroke-width: 0.6;
+    opacity: 0.06;
+  }
+  .bt-scan {
+    animation: bt-scan 9s linear infinite;
+  }
+  @keyframes bt-scan {
+    from { transform: translateY(0); }
+    to { transform: translateY(4px); }
+  }
+
+  /* ---- helix seeding inside the tube ------------------------------------ */
+  .bt-px {
+    fill: var(--color-fig-mid);
+    opacity: 0;
+    animation: bt-seed 14s var(--ease-out-quart) infinite;
+    animation-delay: var(--d);
+  }
+  @keyframes bt-seed {
+    0% { opacity: 0; }
+    6% { opacity: 0.9; }
+    17% { opacity: 0.9; }
+    20%, 100% { opacity: 0; }
+  }
+
+  /* ---- the helix that leaves -------------------------------------------- */
+  .bt-dna-body { animation: bt-dna 14s linear infinite; }
+  @keyframes bt-dna {
+    0%, 18% { opacity: 0; }
+    24%, 66% { opacity: 1; }
+    88%, 100% { opacity: 0; }
+  }
+  .bt-rung {
+    stroke: var(--color-fig-mid);
+    stroke-width: 0.8;
+    opacity: 0.6;
+    animation: bt-rung 14s var(--ease-out-quart) infinite;
+    animation-delay: var(--d);
+  }
+  @keyframes bt-rung {
+    0%, 20% { opacity: 0; }
+    28%, 62% { opacity: 0.6; }
+    72%, 100% { opacity: 0; }
+  }
+  /* Each pixel drifts along its own fixed vector as the structure comes
+     apart, then returns for the next pass. */
+  .bt-dpx {
+    fill: var(--color-fig-bright);
+    animation: bt-break 14s var(--ease-out-quart) infinite;
+    animation-delay: var(--d);
+  }
+  @keyframes bt-break {
+    0%, 62% { transform: translate(0, 0); }
+    86%, 100% { transform: translate(var(--dx), var(--dy)); }
+  }
+
+  /* ---- code fragments following ----------------------------------------- */
+  .bt-fragtext {
+    font-family: var(--font-mono);
+    font-size: 5.5px;
+    letter-spacing: 0.08em;
+    fill: var(--color-fig-mid);
+    /* Centre-anchored: a fragment at the end of its route would otherwise run
+       past the right edge of the frame by its own width. */
+    text-anchor: middle;
+  }
+  /* The CSS fade carries the same negative offset as the SMIL motion, so a
+     fragment's opacity always matches where it actually is on its route. */
+  .bt-frag {
+    animation: bt-frag var(--dur) linear infinite;
+    animation-delay: var(--fd);
+  }
+  /* Fades well before the edge, so nothing ever collides with the frame. */
+  @keyframes bt-frag {
+    0%, 6% { opacity: 0; }
+    16% { opacity: 0.62; }
+    54% { opacity: 0.4; }
+    72%, 100% { opacity: 0; }
+  }
+
+  /* ---- drifting nucleotides --------------------------------------------- */
+  .bt-drift {
+    fill: var(--color-fig-mid);
+    opacity: 0.4;
+    animation: bt-driftmove var(--dur) ease-in-out infinite;
+    animation-delay: var(--d);
+  }
+  @keyframes bt-driftmove {
+    0%, 100% { transform: translate(0, 0); opacity: 0.18; }
+    50% { transform: translate(-3px, -4px); opacity: 0.55; }
+  }
+
+  /* ---- nucleotide palette ------------------------------------------------ */
+  .is-a { fill: var(--color-sci-blue); }
+  .is-t { fill: var(--color-sci-coral); }
+  .is-c { fill: var(--color-sci-amber); }
+  .is-g { fill: var(--color-sci-green); }
+
+  .bt-tick {
+    fill: var(--color-fig-line);
+    opacity: 0.45;
+    animation: bt-tick 9s var(--ease-out-quart) infinite;
+    animation-delay: var(--d);
+  }
+  @keyframes bt-tick { 0%, 100% { opacity: 0.25; } 45% { opacity: 0.8; } }
+
+  .bt-route { fill: none; stroke: none; }
+
+  /* ---- responsive -------------------------------------------------------- */
+  /* Narrow viewports drop the third code fragment, two drifters and the last
+     four sequence ticks. Fewer animated nodes, same composition — nothing
+     rescales and nothing overflows. */
+  @media (max-width: 639px) {
+    .bt-frag--extra, .bt-drift--extra, .bt-tick--wide { display: none; }
+  }
+
+  /* ---- reduced motion ---------------------------------------------------- */
+  /* A resolved state, not a paused frame: the set is on, code is on screen,
+     the helix sits clear of the tube fully formed, and nothing is in flight. */
+  @media (prefers-reduced-motion: reduce) {
+    .bt-pip, .bt-glow, .bt-code, .bt-scan, .bt-px, .bt-dna-body,
+    .bt-rung, .bt-dpx, .bt-frag, .bt-drift, .bt-tick {
+      animation: none !important;
+    }
+    .bt-glow { opacity: 0.06; }
+    .bt-pip { opacity: 0.5; }
+    .bt-px { opacity: 0; }
+    .bt-dna-body { opacity: 1; }
+    .bt-rung { opacity: 0.6; }
+    .bt-dpx { transform: none; }
+    .bt-frag { opacity: 0.45; }
+    .bt-drift { opacity: 0.35; transform: none; }
+    .bt-tick { opacity: 0.5; }
+  }
+</style>

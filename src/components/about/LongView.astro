@@ -1,0 +1,101 @@
+---
+/**
+ * The long view. Typography-led close: a faint pixel field drifting behind a
+ * single statement, and one way forward.
+ */
+import { about } from '@/data/content';
+import Eyebrow from '@/components/ui/Eyebrow.astro';
+import Button from '@/components/ui/Button.astro';
+import { rnd, round } from './pixels';
+
+const dots = Array.from({ length: 54 }, (_, i) => ({
+  x: round(rnd(i, 41) * 100),
+  y: round(rnd(i, 42) * 100),
+  s: rnd(i, 43) < 0.2 ? 3 : 2,
+  dur: round(18 + rnd(i, 44) * 16, 1),
+  delay: round(rnd(i, 45) * -30, 1),
+  rise: round(-4 - rnd(i, 46) * 7, 1),
+  accent: i % 15 === 7,
+}));
+---
+<section class="lv relative overflow-hidden bg-bg" aria-labelledby="long-view-title">
+  <div class="lv-dots" aria-hidden="true">
+    {dots.map((d) => (
+      <span
+        class:list={['lv-dot', d.accent && 'is-accent']}
+        style={`left:${d.x}%;top:${d.y}%;width:${d.s}px;height:${d.s}px;--dur:${d.dur}s;--delay:${d.delay}s;--rise:${d.rise}%`}
+      ></span>
+    ))}
+  </div>
+
+  <div class="container-page relative py-16 md:py-20 lg:py-24">
+    <div class="max-w-4xl">
+      <Eyebrow>{about.longView.eyebrow}</Eyebrow>
+      <p id="long-view-title" class="lv-statement mt-6 text-display text-ink">{about.longView.statement}</p>
+      <p class="lv-body mt-6 max-w-prose text-body-lg text-ink-2">{about.longView.body}</p>
+      <div class="lv-cta mt-8">
+        <Button href="/contact" icon="arrow-right">{about.longView.cta}</Button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const sec = document.querySelector<HTMLElement>('.lv');
+  if (sec) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          sec.classList.add('is-in');
+          io.disconnect();
+        }
+      },
+      { rootMargin: '0px 0px -14% 0px' },
+    );
+    io.observe(sec);
+  }
+</script>
+
+<style>
+  .lv-dots {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    /* The field thins out toward the copy so nothing competes with it. */
+    mask-image: radial-gradient(120% 90% at 50% 50%, rgb(0 0 0 / 0.25), rgb(0 0 0 / 0.9) 70%);
+  }
+  .lv-dot {
+    position: absolute;
+    background: var(--color-fig-mid);
+    opacity: 0.4;
+    animation: lv-drift var(--dur) ease-in-out infinite;
+    animation-delay: var(--delay);
+  }
+  .lv-dot.is-accent { background: var(--color-accent-text); opacity: 0.22; }
+
+  @keyframes lv-drift {
+    0%, 100% { transform: translateY(0); opacity: 0.16; }
+    50% { transform: translateY(var(--rise)); opacity: 0.55; }
+  }
+
+  .lv-statement { letter-spacing: -0.035em; }
+
+  .lv-statement,
+  .lv-body,
+  .lv-cta {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 820ms var(--ease-out-quart), transform 820ms var(--ease-out-quart);
+  }
+  .lv-body { transition-delay: 0.12s; }
+  .lv-cta { transition-delay: 0.22s; }
+  .lv.is-in .lv-statement,
+  .lv.is-in .lv-body,
+  .lv.is-in .lv-cta { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lv-dot { animation: none; opacity: 0.28; }
+    .lv-statement, .lv-body, .lv-cta { opacity: 1; transform: none; transition: none; }
+  }
+</style>

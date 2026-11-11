@@ -1,0 +1,26 @@
+---
+/**
+ * Status indicator. Accepts only the four sanctioned statuses so a fifth
+ * cannot be invented in a template. Colour is never the only signal — the
+ * text label is always present.
+ */
+import { STATUS_LABEL, type Status } from '@/data/site';
+interface Props { status: Status; class?: string }
+const { status, class: className = '' } = Astro.props;
+const tone: Record<Status, string> = {
+  'in-development': 'border-data-warn/40 text-data-warn bg-data-warn/8',
+  planned: 'border-line-strong text-ink-2 bg-surface-high',
+  active: 'border-accent/40 text-accent-text bg-accent/8',
+  'out-of-scope': 'border-line text-ink-muted',
+};
+const dot: Record<Status, string> = {
+  'in-development': 'bg-data-warn',
+  planned: 'bg-ink-muted',
+  active: 'bg-accent',
+  'out-of-scope': 'bg-ink-faint',
+};
+---
+<span class={`label inline-flex items-center gap-2 rounded-sm border px-2.5 py-1.5 ${tone[status]} ${className}`}>
+  <span class={`h-1.5 w-1.5 rounded-full ${dot[status]}`} aria-hidden="true"></span>
+  {STATUS_LABEL[status]}
+</span>

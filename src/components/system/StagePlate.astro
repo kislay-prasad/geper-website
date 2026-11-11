@@ -1,0 +1,434 @@
+---
+/**
+ * StagePlate — a detail view of one region of the StageTransect band.
+ *
+ * Each plate draws the same motif its zone of the band draws, at reading
+ * scale: the read pileup with a variant position; the normalised lattice with
+ * one cell left explicitly empty; the model lattice with one path carrying
+ * through; evidence marks and the relations between them; the conclusion with
+ * its interval and the record beneath it. Stroke only, inherited ink plus the
+ * single accent — so a row and its zone read as the same system.
+ */
+interface Props { stage: string }
+const { stage } = Astro.props;
+
+/* 01 — read pileup */
+type Run = [number, number, number];
+const PILEUP: { y: number; runs: Run[] }[] = [
+  { y: 14, runs: [[6, 44, 0.45], [50, 88, 0.3], [94, 140, 0.42]] },
+  { y: 27, runs: [[10, 52, 0.32], [58, 96, 0.46], [102, 152, 0.28]] },
+  { y: 40, runs: [[6, 38, 0.46], [44, 92, 0.28], [98, 134, 0.44]] },
+  { y: 53, runs: [[14, 60, 0.3], [66, 104, 0.44], [110, 152, 0.32]] },
+  { y: 66, runs: [[6, 48, 0.44], [54, 86, 0.3], [92, 144, 0.46]] },
+  { y: 79, runs: [[10, 56, 0.28], [62, 100, 0.42], [106, 150, 0.3]] },
+  { y: 92, runs: [[6, 42, 0.46], [48, 94, 0.3], [100, 138, 0.42]] },
+];
+const VARIANT_X = 64;
+const VARIANT_ROWS = [27, 53, 92];
+
+/* 02 — normalised lattice */
+const P2_COLS = [20, 38, 56, 74, 92, 110, 128, 146];
+const P2_ROWS = [20, 40, 60, 80];
+const P2_CELL = 6;
+const P2_OPACITY = [
+  [0.44, 0.22, 0.5, 0.28, 0.42, 0.24, 0.38, 0.3],
+  [0.24, 0.46, 0.3, 0.52, 0.22, 0.4, 0.28, 0.46],
+  [0.5, 0.28, 0.42, 0.24, 0.48, 0.3, 0.44, 0.22],
+  [0.22, 0.44, 0.26, 0.4, 0.3, 0.5, 0.2, 0.42],
+];
+const P2_ACCENT: [number, number][] = [[2, 0], [5, 2]];
+const P2_VOID: [number, number] = [4, 3];
+
+/* 03 — model lattice */
+const P3_COLS = [16, 56, 96, 136];
+const P3_ROWS = [18, 40, 62, 84];
+const P3_NODES: [number, number][] = [
+  [0, 0], [0, 1], [0, 2], [0, 3],
+  [1, 1], [1, 2],
+  [2, 0], [2, 2], [2, 3],
+  [3, 1], [3, 2],
+];
+const P3_EDGES: [number, number, number, number, number][] = [
+  [0, 0, 1, 1, 0.32], [0, 1, 1, 1, 0.44], [0, 1, 1, 2, 0.26], [0, 2, 1, 2, 0.46], [0, 3, 1, 2, 0.3],
+  [1, 1, 2, 0, 0.34], [1, 1, 2, 2, 0.24], [1, 2, 2, 2, 0.46], [1, 2, 2, 3, 0.28],
+  [2, 0, 3, 1, 0.32], [2, 2, 3, 1, 0.26], [2, 2, 3, 2, 0.46], [2, 3, 3, 2, 0.3],
+];
+const P3_PATH = [[0, 1], [1, 2], [2, 2], [3, 2]] as [number, number][];
+
+/* 04 — evidence and relations */
+const P4_ROWS = [16, 40, 64, 88];
+const P4_MARKS: ('ink' | 'accent' | 'signal' | 'void')[][] = [
+  ['ink', 'accent'],
+  ['accent', 'ink'],
+  ['ink', 'signal'],
+  ['void', 'ink'],
+];
+const P4_COLS = [40, 78];
+const P4_ARCS: [number, number, number, number][] = [
+  [40, P4_ROWS[1], 78, P4_ROWS[0]],
+  [40, P4_ROWS[2], 78, P4_ROWS[2]],
+  [40, P4_ROWS[3], 78, P4_ROWS[2]],
+];
+const arc = ([x1, y1, x2, y2]: [number, number, number, number]) =>
+  `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${y1} ${x2} ${y2}`;
+
+/* ------------------------------------------------------------------- flow
+   The same pulses the band carries, at plate scale. Routes start and end
+   just outside the viewBox so a pulse is clipped rather than popped into
+   being, and every interior waypoint is a coordinate the plate already
+   draws — a pulse never travels where there is no line. */
+type Route = { d: string; at: number[] };
+const FLOW: Record<string, { dur: number; routes: Route[] }> = {
+  /* 02 — arriving off the grid, converging onto it, then running the lattice. */
+  representation: {
+    dur: 6.4,
+    routes: [
+      { d: `M -8 32 C 6 32, 10 ${P2_ROWS[0]}, 22 ${P2_ROWS[0]} H 168`, at: [0] },
+      { d: `M -8 30 C 6 30, 10 ${P2_ROWS[1]}, 22 ${P2_ROWS[1]} H 168`, at: [1.6] },
+      { d: `M -8 70 C 6 70, 10 ${P2_ROWS[2]}, 22 ${P2_ROWS[2]} H 168`, at: [3.2] },
+      { d: `M -8 72 C 6 72, 10 ${P2_ROWS[3]}, 22 ${P2_ROWS[3]} H 168`, at: [4.8] },
+    ],
+  },
+  /* 03 — branching away from the centre and recombining onto it. */
+  models: {
+    dur: 7,
+    routes: [
+      { d: `M -6 ${P3_ROWS[1]} H 16 L 56 ${P3_ROWS[2]} L 96 ${P3_ROWS[2]} L 136 ${P3_ROWS[2]} H 166`, at: [0] },
+      { d: `M -6 ${P3_ROWS[0]} H 16 L 56 ${P3_ROWS[1]} L 96 ${P3_ROWS[0]} L 136 ${P3_ROWS[1]} H 166`, at: [1.8] },
+      { d: `M -6 ${P3_ROWS[3]} H 16 L 56 ${P3_ROWS[2]} L 96 ${P3_ROWS[3]} L 136 ${P3_ROWS[2]} H 166`, at: [3.5] },
+      { d: `M -6 ${P3_ROWS[2]} H 16 L 56 ${P3_ROWS[2]} L 96 ${P3_ROWS[2]} L 136 ${P3_ROWS[1]} H 166`, at: [5.2] },
+    ],
+  },
+  /* 04 — every track folding into the one result. */
+  interpretation: {
+    dur: 7.5,
+    routes: [
+      ...P4_ROWS.map((y, i) => ({ d: `M -6 ${y} H 104 C 128 ${y}, 132 52, 154 52 H 168`, at: [i * 1.5] })),
+      { d: `M -6 ${P4_ROWS[3]} H 40 Q 59 ${P4_ROWS[3]} 78 ${P4_ROWS[2]} H 104 C 128 ${P4_ROWS[2]}, 132 52, 154 52 H 168`, at: [6.4] },
+    ],
+  },
+  /* 05 — the finished line, running out to the terminal mark. */
+  output: { dur: 6, routes: [{ d: 'M -6 26 H 168', at: [0, 2, 4] }] },
+};
+const flow = FLOW[stage];
+
+/* 01 — how far each row of the pileup drifts, and which way. Reads settle
+   against one another rather than sliding as a block. */
+const DRIFT = [11, 9.5, 13, 10.5, 12, 9, 12.5];
+---
+
+<svg class:list={['plate', `plate--${stage}`]} viewBox="0 0 160 104" role="img" aria-hidden="true" focusable="false">
+  {stage === 'data' && (
+    <g>
+      {PILEUP.map((row, i) => (
+        <g class="plate-drift" style={`--dur: ${DRIFT[i]}s; --dir: ${i % 2 ? -1 : 1}; --i: ${i}`}>
+          {row.runs.map(([x1, x2, o]) => (
+            <line class="plate-read" x1={x1} y1={row.y} x2={x2} y2={row.y} opacity={o} />
+          ))}
+        </g>
+      ))}
+      <line class="plate-guide" x1={VARIANT_X} y1="6" x2={VARIANT_X} y2="100" />
+      {VARIANT_ROWS.map((y, i) => (
+        <line class="plate-mark plate-mark--accent plate-variant" style={`--i: ${i}`} x1={VARIANT_X} y1={y} x2={VARIANT_X} y2={y} />
+      ))}
+    </g>
+  )}
+
+  {stage === 'representation' && (
+    <g>
+      {P2_COLS.map((x) => <line class="plate-column" x1={x} y1="10" x2={x} y2="90" />)}
+      {P2_OPACITY.map((row, r) => row.map((o, c) => (
+        <line class="plate-cell" x1={P2_COLS[c] - P2_CELL} y1={P2_ROWS[r]} x2={P2_COLS[c] + P2_CELL} y2={P2_ROWS[r]} opacity={o} />
+      )))}
+      {P2_ACCENT.map(([c, r]) => (
+        <line class="plate-cell plate-cell--accent" x1={P2_COLS[c] - P2_CELL} y1={P2_ROWS[r]} x2={P2_COLS[c] + P2_CELL} y2={P2_ROWS[r]} />
+      ))}
+      <line class="plate-void" x1={P2_COLS[P2_VOID[0]] - P2_CELL} y1={P2_ROWS[P2_VOID[1]]} x2={P2_COLS[P2_VOID[0]] + P2_CELL} y2={P2_ROWS[P2_VOID[1]]} />
+    </g>
+  )}
+
+  {stage === 'models' && (
+    <g>
+      {P3_EDGES.map(([c1, r1, c2, r2, o]) => (
+        <line class="plate-edge" x1={P3_COLS[c1]} y1={P3_ROWS[r1]} x2={P3_COLS[c2]} y2={P3_ROWS[r2]} opacity={o} />
+      ))}
+      <polyline class="plate-path" points={P3_PATH.map(([c, r]) => `${P3_COLS[c]},${P3_ROWS[r]}`).join(' ')} />
+      {P3_NODES.map(([c, r]) => (
+        <line class="plate-mark" x1={P3_COLS[c]} y1={P3_ROWS[r]} x2={P3_COLS[c]} y2={P3_ROWS[r]} />
+      ))}
+      {P3_PATH.map(([c, r]) => (
+        <line class="plate-mark plate-mark--accent" x1={P3_COLS[c]} y1={P3_ROWS[r]} x2={P3_COLS[c]} y2={P3_ROWS[r]} />
+      ))}
+    </g>
+  )}
+
+  {stage === 'interpretation' && (
+    <g>
+      {P4_ROWS.map((y) => <path class="plate-track" d={`M 6 ${y} H 104 C 128 ${y}, 132 52, 154 52`} />)}
+      {P4_ARCS.map((a) => <path class="plate-relation" d={arc(a)} />)}
+      {P4_MARKS.map((row, r) => row.map((kind, c) => (
+        kind === 'void'
+          ? <line class="plate-void" x1={P4_COLS[c] - 6} y1={P4_ROWS[r]} x2={P4_COLS[c] + 6} y2={P4_ROWS[r]} />
+          : <line class:list={['plate-mark', kind === 'accent' && 'plate-mark--accent', kind === 'signal' && 'plate-mark--signal']} x1={P4_COLS[c]} y1={P4_ROWS[r]} x2={P4_COLS[c]} y2={P4_ROWS[r]} />
+      )))}
+    </g>
+  )}
+
+  {stage === 'output' && (
+    <g>
+      <line class="plate-track" x1="6" y1="26" x2="154" y2="26" />
+      <line class="plate-result" x1="10" y1="26" x2="104" y2="26" />
+      <g class="plate-interval">
+        <line x1="10" y1="46" x2="128" y2="46" />
+        <line x1="10" y1="41" x2="10" y2="51" />
+        <line x1="128" y1="41" x2="128" y2="51" />
+      </g>
+      <line class="plate-interval-mark" x1="66" y1="42" x2="66" y2="50" />
+      <g class="plate-record">
+        <line x1="10" y1="68" x2="150" y2="68" opacity="0.3" />
+        <line x1="10" y1="80" x2="122" y2="80" opacity="0.22" />
+        <line x1="10" y1="92" x2="94" y2="92" opacity="0.16" />
+      </g>
+      <line class="plate-mark plate-mark--accent plate-terminal" x1="140" y1="26" x2="140" y2="26" />
+    </g>
+  )}
+
+  {flow && (
+    <g class="plate-flow">
+      {flow.routes.map((r) => r.at.map((t) => (
+        <line class="plate-pulse" x1="0" y1="0" x2="0" y2="0">
+          <animateMotion dur={`${flow.dur}s`} begin={t ? `-${t}s` : '0s'} repeatCount="indefinite" calcMode="paced" path={r.d} />
+        </line>
+      )))}
+    </g>
+  )}
+</svg>
+
+<style>
+  .plate {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: hidden;
+    color: var(--plate-ink, var(--color-ink-muted));
+    /* Structure inherits `color`; everything that carries meaning resolves
+       through --plate-accent, so a plate matches its zone of the band above. */
+    --plate-accent: var(--color-accent);
+    transition: color 260ms var(--ease-out-quart);
+  }
+
+  /* 01 biological data reads teal, as it does entering the band. */
+  .plate--data { --plate-accent: var(--color-fig-cyan); }
+  /* 04 interpretation is teal evidence with one coral signal among it. */
+  .plate--interpretation { --plate-accent: var(--color-fig-cyan); }
+
+  /* 03 the path that carries through the model is the processing highlight. */
+  .plate--models .plate-path {
+    stroke: var(--color-fig-warm);
+    opacity: 0.85;
+  }
+
+
+  /* Pulses share the band's vocabulary: a round-capped zero-length stroke,
+     a shade smaller than the static marks so those stay the anchor. */
+  .plate-pulse {
+    stroke: var(--plate-accent);
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    opacity: 0.95;
+  }
+
+  .plate-read,
+  .plate-cell {
+    stroke: currentColor;
+    stroke-width: 3.5;
+    fill: none;
+  }
+
+  .plate-cell--accent {
+    stroke: var(--plate-accent);
+    opacity: 0.85;
+  }
+
+  .plate-column,
+  .plate-edge {
+    stroke: currentColor;
+    stroke-width: 1;
+    fill: none;
+  }
+
+  .plate-column {
+    opacity: 0.16;
+  }
+
+  .plate-track {
+    stroke: currentColor;
+    stroke-width: 1;
+    fill: none;
+    opacity: 0.34;
+  }
+
+  .plate-guide {
+    stroke: var(--plate-accent);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+    opacity: 0.32;
+  }
+
+  .plate-path {
+    stroke: var(--plate-accent);
+    stroke-width: 1.4;
+    fill: none;
+    opacity: 0.7;
+  }
+
+  .plate-relation {
+    stroke: var(--plate-accent);
+    stroke-width: 1;
+    fill: none;
+    opacity: 0.32;
+  }
+
+  .plate-mark {
+    stroke: var(--color-ink-2);
+    stroke-width: 5;
+    stroke-linecap: round;
+    opacity: 0.6;
+  }
+
+  .plate-mark--accent {
+    stroke: var(--plate-accent);
+    opacity: 0.9;
+  }
+
+  /* 04 — the one mark worth a second look. */
+  .plate-mark--signal {
+    stroke: var(--color-fig-coral);
+    opacity: 0.92;
+  }
+
+  /* Information that is absent stays drawn, never guessed at. */
+  .plate-void {
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-dasharray: 2 2.5;
+    fill: none;
+    opacity: 0.8;
+  }
+
+  .plate-result {
+    stroke: var(--plate-accent);
+    stroke-width: 6;
+    opacity: 0.92;
+  }
+
+  .plate-interval line {
+    stroke: var(--color-ink-2);
+    stroke-width: 1;
+    opacity: 0.45;
+  }
+
+  .plate-interval-mark {
+    stroke: var(--plate-accent);
+    stroke-width: 1;
+    opacity: 0.55;
+  }
+
+  .plate-record line {
+    stroke: currentColor;
+    stroke-width: 1;
+  }
+
+  /* ------------------------------------------------------------- motion */
+  @media (prefers-reduced-motion: no-preference) {
+    /* 01 — reads settling against one another. */
+    .plate-drift {
+      animation: plate-settle var(--dur) ease-in-out infinite alternate;
+      animation-delay: calc(var(--i) * -1.7s);
+    }
+
+    /* 01 — the variant position, read down the pileup. */
+    .plate-variant {
+      animation: plate-scan 4.8s ease-in-out infinite;
+      animation-delay: calc(var(--i) * 0.5s);
+    }
+
+    /* 05 — the record written under a formed result. */
+    .plate-record {
+      animation: plate-write 9s ease-in-out infinite;
+    }
+
+    /* 05 — the output mark, lit while the result stands. */
+    .plate-terminal {
+      animation: plate-terminal 9s ease-in-out infinite;
+    }
+  }
+
+  @keyframes plate-settle {
+    from { transform: translateX(calc(var(--dir) * -2.2px)); }
+    to { transform: translateX(calc(var(--dir) * 2.2px)); }
+  }
+
+  @keyframes plate-scan {
+    0%, 62%, 100% { opacity: 0.42; }
+    18%, 34% { opacity: 1; }
+  }
+
+  @keyframes plate-write {
+    0%, 22% { opacity: 0.55; }
+    46%, 74% { opacity: 1; }
+    98%, 100% { opacity: 0.55; }
+  }
+
+  @keyframes plate-terminal {
+    0%, 20% { opacity: 0.4; }
+    36%, 72% { opacity: 0.95; }
+    90%, 100% { opacity: 0.4; }
+  }
+
+  /* A plate off screen costs nothing: the script parks its CSS animations
+     here and its SMIL timeline with pauseAnimations(). Without JS the
+     attribute is never set and everything simply runs. */
+  .plate[data-idle] * {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .plate-flow {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  const plates = document.querySelectorAll<SVGSVGElement>('svg.plate');
+
+  if (plates.length) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      /* CSS already hides the pulses; drop them so no timeline keeps ticking. */
+      for (const plate of plates) plate.querySelector('.plate-flow')?.remove();
+    } else {
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const plate = entry.target as SVGSVGElement;
+            if (entry.isIntersecting) {
+              delete plate.dataset.idle;
+              plate.unpauseAnimations();
+            } else {
+              plate.dataset.idle = '';
+              plate.pauseAnimations();
+            }
+          }
+        },
+        { rootMargin: '140px' },
+      );
+
+      for (const plate of plates) {
+        plate.dataset.idle = '';
+        plate.pauseAnimations();
+        io.observe(plate);
+      }
+    }
+  }
+</script>

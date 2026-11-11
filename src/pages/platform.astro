@@ -1,0 +1,14 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import PlatformHero from '@/components/platform/PlatformHero.astro';
+import SystemPipeline from '@/components/platform/SystemPipeline.astro';
+import UpcomingCreation from '@/components/platform/UpcomingCreation.astro';
+import NextStep from '@/components/sections/NextStep.astro';
+---
+<BaseLayout title="Platform" description="The GEPER computational genomics platform: how biological data is represented, modelled and interpreted. In development, not publicly available.">
+  <PlatformHero />
+  <SystemPipeline />
+  <UpcomingCreation />
+
+  <NextStep label="Next" title="The company behind the platform." body="GEPER’s mission, principles and the people building it." href="/about" cta="About GEPER" secondaryHref="/contact" secondaryCta="Contact" />
+</BaseLayout>

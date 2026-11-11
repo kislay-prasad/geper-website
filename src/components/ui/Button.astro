@@ -1,0 +1,29 @@
+---
+/**
+ * CTA button. Renders an <a> when `href` is given, otherwise a <button>.
+ * Variants follow DESIGN.md: primary (accent fill), ghost (1px border), text (label caps, no border).
+ */
+import Icon from './Icon.astro';
+interface Props {
+  href?: string;
+  variant?: 'primary' | 'ghost' | 'text';
+  type?: 'button' | 'submit';
+  icon?: 'arrow-right' | 'arrow-up-right' | 'external';
+  class?: string;
+  id?: string;
+  disabled?: boolean;
+}
+const { href, variant = 'primary', type = 'button', icon, class: className = '', id, disabled } = Astro.props;
+const base = 'inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors duration-150 min-h-11 select-none';
+const styles = {
+  primary: 'bg-accent text-on-accent px-5 py-2.5 hover:bg-accent-deep disabled:opacity-60 disabled:hover:bg-accent',
+  ghost: 'border border-line-strong text-ink px-5 py-2.5 hover:border-accent-text hover:text-accent-text',
+  text: 'label text-accent-text px-1 py-2 hover:text-ink',
+};
+const cls = `${base} ${styles[variant]} ${className}`;
+---
+{href ? (
+  <a href={href} class={cls} id={id}><slot />{icon && <Icon name={icon} size={16} />}</a>
+) : (
+  <button type={type} class={cls} id={id} disabled={disabled}><slot />{icon && <Icon name={icon} size={16} />}</button>
+)}

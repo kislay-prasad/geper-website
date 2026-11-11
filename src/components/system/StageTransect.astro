@@ -1,0 +1,603 @@
+---
+/**
+ * StageTransect — the technology page's signature band.
+ *
+ * Five parallel tracks carry biological data across the band and resolve into
+ * a single readable line. The tracks are continuous: the stacked, ragged read
+ * pileup on the left is normalised onto a lattice, wired into a sparse
+ * computational graph, annotated with evidence, then folded into one
+ * conclusion — so the five stages are regions of one system rather than five
+ * separate objects.
+ *
+ * Geometry is a fixed table, so the markup is byte-stable across builds and
+ * there is no runtime layout work. Every stroke uses `non-scaling-stroke`, and
+ * markers are round-capped zero-length lines rather than circles, so the band
+ * can stretch to any width without weights thinning or dots turning to ovals.
+ */
+import { technology } from '@/data/content';
+
+const W = 1200;
+const H = 280;
+/** Track baselines. Index 2 is the spine that survives to the right edge. */
+const LANE = [50, 88, 126, 164, 202];
+const SPINE = LANE[2];
+/** Tracks fold into the spine across stage 04, where evidence is combined. */
+const MERGE = `C 886 %Y%, 902 ${SPINE}, 960 ${SPINE}`;
+
+/* 01 — a read pileup: fragments stacked either side of every track, each
+   starting and ending where it happens to, the way coverage actually looks. */
+type Run = [number, number, number];
+const PILEUP: { y: number; runs: Run[] }[] = [
+  { y: 42, runs: [[22, 64, 0.42], [72, 118, 0.3], [126, 168, 0.46], [176, 214, 0.28]] },
+  { y: 58, runs: [[16, 52, 0.3], [60, 110, 0.44], [118, 150, 0.26], [158, 204, 0.4]] },
+  { y: 80, runs: [[26, 72, 0.46], [80, 116, 0.28], [124, 178, 0.42], [186, 228, 0.3]] },
+  { y: 96, runs: [[16, 58, 0.32], [66, 104, 0.46], [112, 162, 0.28], [170, 222, 0.44]] },
+  { y: 118, runs: [[20, 78, 0.44], [86, 124, 0.3], [132, 170, 0.46], [178, 216, 0.28]] },
+  { y: 134, runs: [[28, 66, 0.28], [74, 128, 0.42], [136, 174, 0.3], [182, 228, 0.46]] },
+  { y: 156, runs: [[16, 60, 0.42], [68, 112, 0.28], [120, 166, 0.44], [174, 210, 0.32]] },
+  { y: 172, runs: [[24, 70, 0.3], [78, 120, 0.46], [128, 158, 0.28], [166, 222, 0.4]] },
+  { y: 194, runs: [[18, 64, 0.46], [72, 110, 0.3], [118, 172, 0.42], [180, 228, 0.28]] },
+  { y: 210, runs: [[26, 58, 0.28], [66, 116, 0.44], [124, 162, 0.3], [170, 214, 0.46]] },
+];
+/** Two variant positions, read down every track. */
+const VARIANTS = [
+  { x: 100, lanes: [1, 3] },
+  { x: 170, lanes: [0, 2, 4] },
+];
+
+/* 02 — the same information normalised onto one column grid. */
+const COLS = [258, 284, 310, 336, 362, 388, 414, 440, 466];
+const CELL = 7;
+const CELL_OPACITY = [
+  [0.44, 0.2, 0.52, 0.28, 0.46, 0.22, 0.38, 0.3, 0.5],
+  [0.24, 0.48, 0.3, 0.54, 0.22, 0.4, 0.28, 0.46, 0.2],
+  [0.52, 0.28, 0.44, 0.22, 0.5, 0.3, 0.42, 0.24, 0.46],
+  [0.22, 0.46, 0.26, 0.4, 0.28, 0.52, 0.2, 0.44, 0.3],
+  [0.46, 0.24, 0.5, 0.3, 0.38, 0.26, 0.54, 0.22, 0.42],
+];
+const CELL_ACCENT: [number, number][] = [[2, 1], [5, 3], [7, 0]];
+/** Information that is absent stays drawn, never guessed at. */
+const CELL_VOID: [number, number][] = [[4, 4]];
+
+/* 03 — a sparse, track-bound computational lattice. */
+const NODE_COLS = [508, 566, 624, 682];
+const NODES: [number, number][] = [
+  [0, 0], [0, 1], [0, 2], [0, 3], [0, 4],
+  [1, 1], [1, 2], [1, 3],
+  [2, 0], [2, 2], [2, 4],
+  [3, 1], [3, 2], [3, 3],
+];
+const EDGES: [number, number, number, number, number][] = [
+  [0, 0, 1, 1, 0.3], [0, 1, 1, 1, 0.42], [0, 1, 1, 2, 0.26], [0, 2, 1, 2, 0.46],
+  [0, 3, 1, 2, 0.28], [0, 3, 1, 3, 0.4], [0, 4, 1, 3, 0.3],
+  [1, 1, 2, 0, 0.32], [1, 1, 2, 2, 0.24], [1, 2, 2, 2, 0.44], [1, 3, 2, 2, 0.26], [1, 3, 2, 4, 0.34],
+  [2, 0, 3, 1, 0.3], [2, 2, 3, 1, 0.26], [2, 2, 3, 2, 0.46], [2, 2, 3, 3, 0.28], [2, 4, 3, 3, 0.32],
+];
+const NODE_ACCENT: [number, number][] = [[1, 2], [2, 2], [3, 2]];
+
+/* 04 — evidence read off each track, related across tracks, then combined. */
+const EV_COLS = [744, 776, 808];
+type Mark = 'ink' | 'accent' | 'signal' | 'void';
+const EVIDENCE: Mark[][] = [
+  ['ink', 'accent', 'void'],
+  ['accent', 'ink', 'ink'],
+  ['ink', 'signal', 'accent'],
+  ['void', 'ink', 'accent'],
+  ['ink', 'ink', 'void'],
+];
+/** Arcs, not lattice edges: these are relationships between findings. */
+const RELATIONS: [number, number, number, number][] = [
+  [776, LANE[0], 808, LANE[1]],
+  [744, LANE[3], 776, LANE[2]],
+  [776, LANE[2], 808, LANE[3]],
+  [744, LANE[1], 776, LANE[2]],
+  [744, LANE[4], 776, LANE[3]],
+];
+const arc = ([x1, y1, x2, y2]: [number, number, number, number]) =>
+  `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${y1} ${x2} ${y2}`;
+
+/* --------------------------------------------------------------- flow
+   The routes pulses travel, end to end. Every route ends on the spine, so
+   whatever enters at stage 01 leaves as one result at stage 05.
+
+   `main` routes run straight down their track. `branch` routes leave the
+   track at stage 03 and trace real lattice edges before rejoining — two of
+   them rejoin on a *different* track, which is the split and the merge —
+   and two more cross between tracks along the stage 04 evidence relations.
+   Every waypoint below is a coordinate that already exists in EDGES or
+   RELATIONS, so a pulse never travels where nothing is drawn. */
+const merge = (y: number) => `H 830 C 886 ${y}, 902 ${SPINE}, 960 ${SPINE} H 1184`;
+
+/* `kind` only selects the colour a pulse moves through — geometry, timing
+   and pacing are untouched. */
+type Route = { d: string; branch?: boolean; kind?: 'model' | 'signal'; at: number[] };
+/** One traverse takes DUR seconds on every route, so the flow rate is uniform. */
+const DUR = 9;
+
+const FLOWS: Route[] = [
+  { d: `M 16 ${LANE[0]} ${merge(LANE[0])}`, at: [0, 3.1, 6.2] },
+  { d: `M 16 ${LANE[1]} ${merge(LANE[1])}`, at: [1.1, 4.2, 7.3] },
+  { d: `M 16 ${SPINE} H 1184`, at: [0.5, 3.6, 6.7] },
+  { d: `M 16 ${LANE[3]} ${merge(LANE[3])}`, at: [2, 5.1, 8.2] },
+  { d: `M 16 ${LANE[4]} ${merge(LANE[4])}`, at: [1.6, 4.7, 7.8] },
+
+  /* 03 · excursions through the model lattice */
+  { d: `M 16 ${LANE[0]} H 508 L 566 ${LANE[1]} L 624 ${LANE[0]} L 682 ${LANE[1]} ${merge(LANE[1])}`, branch: true, kind: 'model', at: [2.4, 7] },
+  { d: `M 16 ${LANE[1]} H 508 L 566 ${SPINE} L 624 ${SPINE} L 682 ${LANE[1]} ${merge(LANE[1])}`, branch: true, kind: 'model', at: [0.8, 5.6] },
+  { d: `M 16 ${LANE[3]} H 508 L 566 ${SPINE} L 624 ${SPINE} L 682 ${LANE[3]} ${merge(LANE[3])}`, branch: true, kind: 'model', at: [3.3, 8] },
+  { d: `M 16 ${LANE[4]} H 508 L 566 ${LANE[3]} L 624 ${LANE[4]} L 682 ${LANE[3]} ${merge(LANE[3])}`, branch: true, kind: 'model', at: [1.9, 6.4] },
+
+  /* 04 · crossings along the evidence relations */
+  { d: `M 16 ${LANE[1]} H 744 Q 760 ${LANE[1]} 776 ${SPINE} ${merge(SPINE)}`, branch: true, kind: 'signal', at: [4.4] },
+  { d: `M 16 ${LANE[4]} H 744 Q 760 ${LANE[4]} 776 ${LANE[3]} ${merge(LANE[3])}`, branch: true, kind: 'signal', at: [6.9] },
+];
+---
+
+<div class="transect" data-transect>
+  <svg class="transect-field" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
+    <!-- Continuous tracks: five in, one out. -->
+    <g class="t-lane">
+      <path d={`M 16 ${SPINE} H 1184`} />
+      {LANE.filter((_, i) => i !== 2).map((y) => (
+        <path d={`M 16 ${y} H 830 ${MERGE.replace('%Y%', String(y))}`} />
+      ))}
+    </g>
+
+    <g class="t-detail">
+      <!-- 01 · read pileup and variant positions -->
+      {PILEUP.map((row) => row.runs.map(([x1, x2, o]) => (
+        <line class="t-read" x1={x1} y1={row.y} x2={x2} y2={row.y} opacity={o} vector-effect="non-scaling-stroke" />
+      )))}
+      {VARIANTS.map((v) => <line class="t-guide" x1={v.x} y1="34" x2={v.x} y2="218" vector-effect="non-scaling-stroke" />)}
+
+      <!-- 02 · normalised lattice -->
+      {COLS.map((x) => <line class="t-column" x1={x} y1="38" x2={x} y2="214" vector-effect="non-scaling-stroke" />)}
+      {CELL_OPACITY.map((row, i) => row.map((o, c) => (
+        <line class="t-cell" x1={COLS[c] - CELL} y1={LANE[i]} x2={COLS[c] + CELL} y2={LANE[i]} opacity={o} vector-effect="non-scaling-stroke" />
+      )))}
+      {CELL_VOID.map(([c, i]) => (
+        <line class="t-void" x1={COLS[c] - CELL} y1={LANE[i]} x2={COLS[c] + CELL} y2={LANE[i]} vector-effect="non-scaling-stroke" />
+      ))}
+
+      <!-- 03 · model lattice -->
+      {EDGES.map(([c1, l1, c2, l2, o]) => (
+        <line class="t-edge" x1={NODE_COLS[c1]} y1={LANE[l1]} x2={NODE_COLS[c2]} y2={LANE[l2]} opacity={o} vector-effect="non-scaling-stroke" />
+      ))}
+      {NODES.map(([c, l]) => (
+        <line class="t-node" x1={NODE_COLS[c]} y1={LANE[l]} x2={NODE_COLS[c]} y2={LANE[l]} vector-effect="non-scaling-stroke" />
+      ))}
+
+      <!-- 04 · evidence, related, then combined -->
+      {RELATIONS.map((r) => <path class="t-relation" d={arc(r)} vector-effect="non-scaling-stroke" />)}
+      {EVIDENCE.map((lane, i) => lane.map((kind, c) => (
+        kind === 'void'
+          ? <line class="t-void" x1={EV_COLS[c] - 7} y1={LANE[i]} x2={EV_COLS[c] + 7} y2={LANE[i]} vector-effect="non-scaling-stroke" />
+          : <line class:list={['t-node', kind === 'accent' && 't-node--bio', kind === 'signal' && 't-node--signal']} x1={EV_COLS[c]} y1={LANE[i]} x2={EV_COLS[c]} y2={LANE[i]} vector-effect="non-scaling-stroke" />
+      )))}
+
+      <!-- 05 · the readable record -->
+      <g class="t-readout">
+        <line x1="982" y1="176" x2="1140" y2="176" opacity="0.26" vector-effect="non-scaling-stroke" />
+        <line x1="982" y1="188" x2="1092" y2="188" opacity="0.18" vector-effect="non-scaling-stroke" />
+      </g>
+    </g>
+
+    <!-- Pulses: information moving through the pipeline. The mask dissolves
+         them at both ends, so none pops into being against the band edge. -->
+    <defs>
+      <linearGradient id="transect-flow-fade" x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0" stop-color="#fff" stop-opacity="0" />
+        <stop offset="0.05" stop-color="#fff" stop-opacity="1" />
+        <stop offset="0.95" stop-color="#fff" stop-opacity="1" />
+        <stop offset="1" stop-color="#fff" stop-opacity="0" />
+      </linearGradient>
+      <mask id="transect-flow-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
+        <rect width={W} height={H} fill="url(#transect-flow-fade)" />
+      </mask>
+    </defs>
+
+    <g class="t-flow" mask="url(#transect-flow-mask)">
+      {FLOWS.map((f) => f.at.map((t) => (
+        <line
+          class:list={['t-pulse', f.branch && 't-pulse--branch', f.kind === 'model' && 't-pulse--model', f.kind === 'signal' && 't-pulse--signal']}
+          style={`--hue-delay:-${t}s`}
+          x1="0" y1="0" x2="0" y2="0"
+          vector-effect="non-scaling-stroke"
+        >
+          <animateMotion dur={`${DUR}s`} begin={t ? `-${t}s` : '0s'} repeatCount="indefinite" calcMode="paced" path={f.d} />
+        </line>
+      )))}
+    </g>
+
+    <!-- Accents that survive to the smallest screens: variants in, result out. -->
+    <g class="t-core">
+      {VARIANTS.map((v) => v.lanes.map((l) => (
+        <line class="t-node t-node--bio" x1={v.x} y1={LANE[l]} x2={v.x} y2={LANE[l]} vector-effect="non-scaling-stroke" />
+      )))}
+      {CELL_ACCENT.map(([c, i]) => (
+        <line class="t-cell t-cell--accent" x1={COLS[c] - CELL} y1={LANE[i]} x2={COLS[c] + CELL} y2={LANE[i]} vector-effect="non-scaling-stroke" />
+      ))}
+      {NODE_ACCENT.map(([c, l]) => (
+        <line class="t-node t-node--accent" x1={NODE_COLS[c]} y1={LANE[l]} x2={NODE_COLS[c]} y2={LANE[l]} vector-effect="non-scaling-stroke" />
+      ))}
+      <line class="t-result" x1="982" y1={SPINE} x2="1122" y2={SPINE} vector-effect="non-scaling-stroke" />
+      <g class="t-interval">
+        <line x1="982" y1="152" x2="1122" y2="152" vector-effect="non-scaling-stroke" />
+        <line x1="982" y1="146" x2="982" y2="158" vector-effect="non-scaling-stroke" />
+        <line x1="1122" y1="146" x2="1122" y2="158" vector-effect="non-scaling-stroke" />
+      </g>
+      <line class="t-interval-mark" x1="1052" y1="147" x2="1052" y2="157" vector-effect="non-scaling-stroke" />
+      <line class="t-node t-node--accent" x1="1158" y1={SPINE} x2="1158" y2={SPINE} vector-effect="non-scaling-stroke" />
+    </g>
+  </svg>
+
+  <ol class="transect-zones">
+    {technology.layers.map((L) => (
+      <li>
+        <a class="transect-zone" href={`#${L.id}`}>
+          <span class="transect-zone__index">{L.index}</span>
+          <span class="transect-zone__title">{L.title}</span>
+        </a>
+      </li>
+    ))}
+  </ol>
+</div>
+
+<style>
+  .transect {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    height: clamp(13rem, 20vw, 17.5rem);
+    border: 1px solid var(--color-line-faint);
+    border-radius: var(--radius-lg);
+    /* Cream-white ground with its own grid, so the band reads as an instrument
+       panel. The blue wash stays on top of the grid, the grid on top of the
+       fill. */
+    background-color: var(--color-bg-raised);
+    background-image:
+      radial-gradient(110% 130% at 10% 50%, rgb(37 99 235 / 0.05), transparent 60%),
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.24) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.24) 1px, transparent 1px);
+    background-size: auto, 48px 48px, 48px 48px;
+  }
+
+  /* The field never enters the strips the zone labels occupy, so a title that
+     wraps to two lines can never collide with the trace. */
+  .transect-field {
+    position: absolute;
+    inset: 1.9rem 0 3.15rem;
+    width: 100%;
+    height: auto;
+  }
+
+  .t-lane path {
+    fill: none;
+    stroke: var(--color-ink-muted);
+    stroke-width: 1;
+    opacity: 0.34;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* 01 — sequence fragments */
+  .t-read {
+    stroke: var(--color-ink-muted);
+    stroke-width: 3;
+  }
+
+  .t-guide {
+    stroke: var(--color-accent-text);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+    opacity: 0.3;
+  }
+
+  /* 02 — lattice */
+  .t-column {
+    stroke: var(--color-ink-muted);
+    stroke-width: 1;
+    opacity: 0.16;
+  }
+
+  .t-cell {
+    stroke: var(--color-ink-muted);
+    stroke-width: 4;
+  }
+
+  .t-cell--accent {
+    stroke: var(--color-accent);
+    opacity: 0.85;
+  }
+
+  /* Absence, drawn explicitly. */
+  .t-void {
+    stroke: var(--color-ink-muted);
+    stroke-width: 1.5;
+    stroke-dasharray: 2 2.5;
+    opacity: 0.8;
+  }
+
+  /* 03 — model lattice */
+  .t-edge {
+    stroke: var(--color-ink-muted);
+    stroke-width: 1;
+  }
+
+  .t-node {
+    stroke: var(--color-ink-2);
+    stroke-width: 5;
+    stroke-linecap: round;
+    opacity: 0.6;
+  }
+
+  .t-node--accent {
+    stroke: var(--color-accent);
+    opacity: 0.9;
+  }
+
+  /* Biological material and genomic variation read teal; a single evidence
+     mark reads coral, as one signal worth noticing. */
+  .t-node--bio {
+    stroke: var(--color-fig-cyan);
+    opacity: 0.9;
+  }
+
+  .t-node--signal {
+    stroke: var(--color-fig-coral);
+    opacity: 0.92;
+  }
+
+  /* 04 — relationships between findings */
+  .t-relation {
+    fill: none;
+    stroke: var(--color-accent-text);
+    stroke-width: 1;
+    opacity: 0.3;
+  }
+
+  /* Pulses — a zero-length round-capped stroke, so a pulse stays a circle of
+     constant size however far the band is stretched. */
+  /* A pulse changes colour as it crosses the band, on the same 9s cycle and
+     the same offset as its motion — so the hue is a function of where it is,
+     not of time. Stage boundaries fall at 19.2 / 39.7 / 60.3 / 80.8% of the
+     traverse; the stops sit just inside them so each change reads as a
+     transition rather than a switch. */
+  .t-pulse {
+    stroke: var(--color-fig-cyan);
+    stroke-width: 4.5;
+    stroke-linecap: round;
+    opacity: 0.9;
+    filter: drop-shadow(0 0 2.5px color-mix(in srgb, var(--color-accent) 32%, transparent));
+    animation: t-hue 9s linear infinite;
+    animation-delay: var(--hue-delay, 0s);
+  }
+
+  /* 01 biological data → 02 representation → 03/04 → 05 output */
+  @keyframes t-hue {
+    0%, 17% { stroke: var(--color-fig-cyan); }
+    30%, 58% { stroke: var(--color-accent); }
+    70% { stroke: var(--color-fig-cyan); }
+    84%, 100% { stroke: var(--color-accent); }
+  }
+
+  /* Lattice excursions pick up an amber transition through the model. */
+  .t-pulse--model {
+    animation-name: t-hue-model;
+  }
+  @keyframes t-hue-model {
+    0%, 17% { stroke: var(--color-fig-cyan); }
+    30%, 40% { stroke: var(--color-accent); }
+    48%, 56% { stroke: var(--color-fig-warm); }
+    68%, 100% { stroke: var(--color-accent); }
+  }
+
+  /* Evidence crossings carry the occasional coral signal. */
+  .t-pulse--signal {
+    animation-name: t-hue-signal;
+  }
+  @keyframes t-hue-signal {
+    0%, 17% { stroke: var(--color-fig-cyan); }
+    30%, 60% { stroke: var(--color-accent); }
+    72%, 80% { stroke: var(--color-fig-coral); }
+    90%, 100% { stroke: var(--color-accent); }
+  }
+
+  .t-pulse--branch {
+    stroke-width: 3.5;
+    opacity: 0.62;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .t-pulse { animation: none; }
+  }
+
+  /* 05 — the record */
+  .t-readout line {
+    stroke: var(--color-ink-muted);
+    stroke-width: 1;
+  }
+
+  .t-result {
+    stroke: var(--color-accent);
+    stroke-width: 6;
+    opacity: 0.92;
+  }
+
+  .t-interval line {
+    stroke: var(--color-ink-2);
+    stroke-width: 1;
+    opacity: 0.45;
+  }
+
+  .t-interval-mark {
+    stroke: var(--color-accent-text);
+    stroke-width: 1;
+    opacity: 0.55;
+  }
+
+  .transect-zones {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .transect-zone {
+    position: relative;
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 0.85rem 0.85rem 0.9rem;
+    text-decoration: none;
+    transition: background-color 260ms var(--ease-out-quart);
+  }
+
+  .transect-zones li + li .transect-zone {
+    border-left: 1px solid var(--color-line-faint);
+  }
+
+  .transect-zone::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -1px;
+    right: 0;
+    height: 2px;
+    background: var(--color-accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 320ms var(--ease-out-quart);
+  }
+
+  .transect-zone:hover,
+  .transect-zone:focus-visible {
+    background-color: rgb(110 168 255 / 0.05);
+  }
+
+  .transect-zone:hover::before,
+  .transect-zone:focus-visible::before {
+    transform: scaleX(1);
+  }
+
+  .transect-zone__index {
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-ink-muted);
+    transition: color 220ms ease;
+  }
+
+  .transect-zone__title {
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    font-weight: 500;
+    color: var(--color-ink-2);
+    text-wrap: balance;
+    transition: color 220ms ease;
+  }
+
+  .transect-zone:hover .transect-zone__index,
+  .transect-zone:focus-visible .transect-zone__index,
+  .transect-zone:hover .transect-zone__title,
+  .transect-zone:focus-visible .transect-zone__title {
+    color: var(--color-accent-text);
+  }
+
+  /* Motion is opt-in: with no JS the field is simply present and complete. */
+  .transect[data-armed] .transect-field {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  .transect[data-armed][data-live] .transect-field {
+    clip-path: inset(0 0 0 0);
+    transition: clip-path 1500ms var(--ease-out-quart);
+  }
+
+  @media (max-width: 767px) {
+    .transect-field {
+      inset: 1.65rem 0 3.3rem;
+    }
+
+    .transect-zone {
+      padding: 0.65rem 0.5rem 0.75rem;
+    }
+
+    .transect-zone__title {
+      font-size: 0.6875rem;
+    }
+  }
+
+  /* Below the point where a fifth of the width can carry detail, the band
+     keeps only the tracks and the accents: raw variants in, one result out. */
+  @media (max-width: 639px) {
+    .transect {
+      height: 10.5rem;
+    }
+
+    .t-detail,
+    .t-pulse--branch {
+      display: none;
+    }
+
+    /* Smaller band, smaller pulses. */
+    .t-pulse {
+      stroke-width: 3.5;
+    }
+  }
+
+  @media (max-width: 479px) {
+    .transect {
+      height: 8.5rem;
+    }
+
+    .transect-field {
+      inset: 1.5rem 0 1rem;
+    }
+
+    .transect-zone__title {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .transect[data-armed] .transect-field,
+    .transect[data-armed][data-live] .transect-field {
+      clip-path: none;
+    }
+
+    .t-flow {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  const band = document.querySelector<HTMLElement>('[data-transect]');
+
+  if (band) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      band.dataset.live = '';
+      /* CSS already hides the pulses; remove them so nothing keeps ticking. */
+      band.querySelector('.t-flow')?.remove();
+    } else {
+      band.dataset.armed = '';
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            band.dataset.live = '';
+            io.disconnect();
+          }
+        },
+        { threshold: 0.2 },
+      );
+      io.observe(band);
+    }
+  }
+</script>

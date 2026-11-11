@@ -1,0 +1,338 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+/* ------------------------------------------------------------------
+   GEPER design tokens — single source of truth.
+   Derived from the Stitch DESIGN.md ("Synthetic Intelligence") with the
+   corrections noted in the Phase 1 audit (circular rounded-full, radius
+   scale, fallback font stacks). Every colour used in the site must come
+   from here; components never introduce hex values.
+
+   Theme: warm cream ground, near-black type, charcoal detail. The scale
+   below is the inversion of the original dark theme — every contrast
+   relationship keeps its direction, so nothing downstream had to change.
+   ------------------------------------------------------------------ */
+@theme {
+  /* Surfaces (tonal layering, lightest to deepest). Warm and low-chroma:
+     cream, not beige — the hue is held back so type stays the loudest thing
+     on the page. */
+  --color-bg-raised: #fffdf8;
+  --color-bg: #f6f3ec;
+  --color-bg-elevated: #f1ece2;
+  --color-surface: #e9e3d6;
+  --color-surface-high: #e0d9ca;
+  --color-surface-highest: #d6cebd;
+
+  /* Lines — charcoal at low alpha, so hairlines stay hairlines */
+  --color-line: rgb(38 37 44 / 0.22);
+  --color-line-strong: rgb(38 37 44 / 0.45);
+  --color-line-faint: rgb(38 37 44 / 0.12);
+
+  /* Text */
+  --color-ink: #17161a;
+  --color-ink-2: #3b3a42;
+  --color-ink-muted: #6a6971;
+  --color-ink-faint: #93919a;
+
+  /* Accent — blue, matched to the GEPER mark, and now reserved for it.
+     `accent` fills (white text, AA) carry the brand: buttons, the logo rule.
+     `accent-text` is deliberately drained to a near-black ink so labels,
+     numerals and links read as typography rather than as a blue theme. */
+  --color-accent: #1d4ed8;
+  --color-accent-text: #22293a;
+  --color-accent-deep: #17307d;
+  --color-on-accent: #ffffff;
+
+  /* Data semantics only — never decoration. Darkened for a light ground:
+     the dark theme's yellow and red are unreadable on cream. */
+  --color-data-warn: #8a6408;
+  --color-data-critical: #b42318;
+  --color-data-neutral: #565b6b;
+
+  /* Scientific-figure palette. Used only inside diagrams, and only where a
+     distinction carries meaning — one hue per modality, never for decoration.
+     `fig-line`/`fig-mid`/`fig-bright` are the neutrals that should carry most
+     of the motion; accent blue stays reserved for the highlight that matters
+     (a variant, an active state, a result). Deliberately low-chroma: on the
+     cream field these read as tinted greys, not as colour. `fig-bright` is the
+     most present tone and `fig-line` the faintest — the naming follows
+     prominence, not lightness, so it survives the theme inversion. */
+  --color-fig-bright: #232228;
+  --color-fig-mid: #63626a;
+  --color-fig-line: #949299;
+  --color-fig-cyan: #2f6b78;
+  --color-fig-violet: #554d80;
+  --color-fig-green: #3f6b56;
+  /* Warm amber for biological material moving through a system. Distinct from
+     --color-data-warn, which stays reserved for status semantics. */
+  --color-fig-warm: #8a6633;
+  /* Occasional biological signal. Reserved for figures, and used sparingly —
+     status red stays --color-data-critical. */
+  --color-fig-coral: #a1554a;
+
+  /* Research figure palette. A restrained scientific set used only by the
+     research visualisations: blue is the active signal, green is biological
+     information, amber is computational work, coral is rare emphasis. */
+  --color-sci-blue: #1677d2;
+  --color-sci-green: #2fae7a;
+  --color-sci-amber: #d6a23a;
+  --color-sci-coral: #c95c5c;
+
+  /* Typography */
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-display: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.03em;
+  --text-display--font-weight: 700;
+
+  --text-h1: clamp(2rem, 1.4rem + 2.2vw, 3rem);
+  --text-h1--line-height: 1.1;
+  --text-h1--letter-spacing: -0.025em;
+  --text-h1--font-weight: 700;
+
+  --text-h2: clamp(1.625rem, 1.3rem + 1.2vw, 2rem);
+  --text-h2--line-height: 1.2;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h2--font-weight: 600;
+
+  --text-h3: 1.375rem;
+  --text-h3--line-height: 1.3;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 600;
+
+  --text-body-lg: 1.125rem;
+  --text-body-lg--line-height: 1.65;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-body-sm: 0.9375rem;
+  --text-body-sm--line-height: 1.55;
+
+  --text-label: 0.75rem;
+  --text-label--line-height: 1;
+  --text-label--letter-spacing: 0.12em;
+  --text-label--font-weight: 600;
+
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.5;
+
+  /* Radius: technical, precise. rounded-full is genuinely circular. */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* Layout */
+  --container-page: 80rem; /* 1280px */
+  --container-prose: 42rem;
+
+  /* Motion */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* ------------------------------------------------------------------
+   Theme channels + dark theme.
+
+   `--grid-ink` is the RGB triple every background grid and dot pattern is
+   drawn from, so the site's background geometry inverts by changing one value
+   — no pattern rule anywhere needs a dark variant.
+
+   Dark is applied by `data-theme="dark"` on <html>, set before first paint by
+   the inline script in BaseLayout. It is opt-in only: there is no
+   prefers-color-scheme rule, so a visitor who has never chosen gets light.
+   ------------------------------------------------------------------ */
+:root {
+  --grid-ink: 38 37 44;
+  --selection: 29 78 216 / 0.18;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Deep warm charcoal, never pure black — the same tonal ladder as light,
+     inverted, so every contrast relationship keeps its direction. */
+  --color-bg-raised: #1f1e26;
+  --color-bg: #16151a;
+  --color-bg-elevated: #1b1a21;
+  --color-surface: #232229;
+  --color-surface-high: #2b2a33;
+  --color-surface-highest: #34333d;
+
+  --color-line: rgb(235 232 224 / 0.20);
+  --color-line-strong: rgb(235 232 224 / 0.42);
+  --color-line-faint: rgb(235 232 224 / 0.10);
+
+  /* Warm off-white, then muted greys — not blue-tinted, so the accents stay
+     the only real colour on the page. */
+  --color-ink: #f2efe8;
+  --color-ink-2: #c7c4bd;
+  --color-ink-muted: #96938d;
+  --color-ink-faint: #6e6b67;
+
+  --color-accent: #3b82f6;
+  --color-accent-text: #dfe3ec;
+  --color-accent-deep: #1d4ed8;
+  --color-on-accent: #0d1220;
+
+  --color-data-warn: #e3ac33;
+  --color-data-critical: #f2685c;
+  --color-data-neutral: #9aa1b3;
+
+  /* Figure neutrals invert by prominence, not lightness: `fig-bright` stays
+     the most present tone, `fig-line` the faintest. */
+  --color-fig-bright: #e9e6e0;
+  --color-fig-mid: #a3a1a8;
+  --color-fig-line: #6c6a72;
+  --color-fig-cyan: #5cb8c8;
+  --color-fig-violet: #9d93d4;
+  --color-fig-green: #6fbd93;
+  --color-fig-warm: #d9a05c;
+  --color-fig-coral: #e08a7c;
+
+  /* Research palette keeps its meaning — blue computational, green
+     biological, amber data, coral rare emphasis — lifted for a dark ground. */
+  --color-sci-blue: #4f9ff0;
+  --color-sci-green: #45cf95;
+  --color-sci-amber: #edbb55;
+  --color-sci-coral: #e5786f;
+
+  --grid-ink: 235 232 224;
+  --selection: 59 130 246 / 0.30;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-bg text-ink font-sans text-body antialiased;
+    overflow-x: hidden;
+  }
+  /* Only while a theme switch is in flight. A permanent transition here would
+     make every hover and scroll-driven colour change lag by the same amount.
+
+     `.tt-px` — the theme switch's own pixel helix — is excluded because it
+     transitions `transform`, which this colour-only list would strip. It is an
+     exclusion rather than an override because these declarations are
+     !important inside a layer, and layered !important always beats unlayered
+     !important no matter how specific the other selector is. */
+  :root.theme-switching,
+  :root.theme-switching *:not(.tt-px),
+  :root.theme-switching *::before,
+  :root.theme-switching *::after {
+    transition:
+      background-color 260ms var(--ease-out-quart),
+      border-color 260ms var(--ease-out-quart),
+      color 260ms var(--ease-out-quart),
+      fill 260ms var(--ease-out-quart),
+      stroke 260ms var(--ease-out-quart) !important;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :root.theme-switching,
+    :root.theme-switching *,
+    :root.theme-switching *::before,
+    :root.theme-switching *::after { transition: none !important; }
+  }
+
+  ::selection {
+    background: rgb(var(--selection));
+  }
+
+  /* Visible, consistent focus for every interactive element */
+  :focus-visible {
+    outline: 2px solid var(--color-accent-text);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  h1, h2, h3, h4 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Technical label: mono, uppercase, tracked. The site's signature idiom. */
+  .label {
+    @apply font-mono text-label uppercase;
+  }
+
+  .container-page {
+    @apply mx-auto w-full max-w-page px-5 sm:px-8 lg:px-16;
+  }
+
+  /* Skip link */
+  .skip-link {
+    @apply sr-only;
+  }
+  .skip-link:focus {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 100;
+    width: auto;
+    height: auto;
+    padding: 0.75rem 1rem;
+    clip: auto;
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    font-weight: 600;
+    border-radius: var(--radius-md);
+  }
+
+  /* Background patterns — replaces the inline styles in the export. */
+  .pattern-grid {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.115) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.115) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  .pattern-dots {
+    background-image: radial-gradient(rgb(var(--grid-ink) / 0.215) 1px, transparent 1.5px);
+    background-size: 24px 24px;
+  }
+  .pattern-fade-y {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+    mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+  }
+
+  /* Hairline rule with a short accent segment */
+  .rule-accent {
+    @apply relative h-px w-full bg-line;
+  }
+  .rule-accent::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 1px;
+    width: 3rem;
+    background: var(--color-accent);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

@@ -1,0 +1,245 @@
+---
+/**
+ * The main explainer: one continuous pipeline, four stages.
+ *
+ * A single spine runs down the left. Each stage draws its own segment of the
+ * spine as it enters the viewport and reveals its copy — once, permanently.
+ * A second observer drives `data-live` on the diagram, which does toggle, so
+ * nothing animates off screen.
+ */
+import { research } from '@/data/content';
+import Eyebrow from '@/components/ui/Eyebrow.astro';
+import StageVisual from './StageVisual.astro';
+const stages = research.pipeline;
+---
+<section class="relative border-y border-line-faint bg-bg-elevated" aria-labelledby="pipeline-title">
+  <div class="pipeline-grid pointer-events-none absolute inset-0 pattern-grid pattern-fade-y opacity-60" aria-hidden="true"></div>
+
+  <div class="container-page relative py-12 md:py-16 lg:py-20">
+    <div class="mb-10 flex max-w-3xl flex-col gap-3 lg:mb-14">
+      <Eyebrow>The research pipeline</Eyebrow>
+      <h2 id="pipeline-title" class="text-h2 text-ink">How a variant becomes an interpretation.</h2>
+      <p class="max-w-prose text-body-lg text-ink-2">
+        Four stages, each with its own open questions. The work at every stage constrains what the next one can honestly claim.
+      </p>
+    </div>
+
+    <ol class="rp-list" id="rp-list" aria-label="The four research stages">
+      {stages.map((s, i) => (
+        <li
+          class="rp-stage relative grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-4 gap-y-5 pb-12 last:pb-0 lg:grid-cols-[3rem_minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-x-10 lg:pb-20"
+          data-stage={s.id}
+        >
+          {/* The connector is a child of the row, not of the spine cell, so it
+              spans the row's bottom padding and meets the next stage's dot. */}
+          {i < stages.length - 1 && <span class="rp-line" aria-hidden="true"></span>}
+
+          <div class="rp-spine row-span-2 lg:row-span-1" aria-hidden="true">
+            <span class="rp-dot"></span>
+          </div>
+
+          <div class="rp-copy lg:pt-1">
+            {/* Neutral by default. The label takes the accent only while its
+                stage is the one being read — blue marks a state, not a class
+                of text. */}
+            <p class="rp-label label flex items-center gap-3">
+              <span class="rp-index">{s.index}</span>{s.label}
+            </p>
+            <h3 class="mt-4 text-h3 text-ink">{s.title}</h3>
+            <p class="mt-3 max-w-prose text-body text-ink-2">{s.body}</p>
+          </div>
+
+          <div class="rp-panel col-start-2 lg:col-start-3 lg:row-start-1">
+            <div class="rp-frame relative overflow-hidden rounded-lg border border-line bg-bg">
+              <div class="aspect-[16/9] w-full sm:aspect-[9/5]">
+                <StageVisual stage={s.id} />
+              </div>
+              <p class="label border-t border-line-faint px-4 py-2.5 text-ink-muted">{s.caption}</p>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ol>
+    {/* Runs during parse, so the hidden-until-revealed state is only ever
+        applied when there is JavaScript to reveal it again. */}
+    <script is:inline>document.getElementById('rp-list')?.classList.add('rp-js');</script>
+  </div>
+</section>
+
+<script>
+  const stages = Array.from(document.querySelectorAll<HTMLElement>('.rp-stage'));
+
+  if (stages.length) {
+    /* Two separate concerns:
+       `is-seen` reveals the stage and is one-way — once read, a stage never
+       disappears again. `data-live` drives the diagram's animation and does
+       toggle, so nothing animates off screen. */
+    const reveal = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.classList.add('is-seen');
+          reveal.unobserve(entry.target);
+        }
+      },
+      /* Fire a little before the stage is centred, so the diagram has already
+         started drawing by the time the copy is comfortable to read. */
+      { rootMargin: '-8% 0px -18% 0px', threshold: 0.01 },
+    );
+
+    /* Animation gating is a separate concern from "which stage is being
+       read": several diagrams may be on screen and animating at once. */
+    const animate = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          entry.target.querySelector('svg')?.setAttribute('data-live', String(entry.isIntersecting));
+        }
+      },
+      { rootMargin: '-8% 0px -18% 0px', threshold: 0.01 },
+    );
+
+    stages.forEach((s) => {
+      reveal.observe(s);
+      animate.observe(s);
+    });
+
+    /* Exactly one stage is "current" — the one nearest the reading line.
+       That keeps a single accent marker on the page instead of a column of
+       them, so blue still means "here", not "this is a heading". */
+    let near = false;
+    let frame = 0;
+    let current = -1;
+
+    const pick = () => {
+      frame = 0;
+      const line = window.innerHeight * 0.42;
+      let best = -1;
+      let bestDist = Infinity;
+      stages.forEach((s, i) => {
+        const box = s.getBoundingClientRect();
+        if (box.bottom < 0 || box.top > window.innerHeight) return;
+        const dist = Math.abs(box.top + Math.min(box.height, window.innerHeight) / 2 - line);
+        if (dist < bestDist) { bestDist = dist; best = i; }
+      });
+      if (best === current) return;
+      current = best;
+      stages.forEach((s, i) => s.classList.toggle('is-current', i === best));
+    };
+
+    const onScroll = () => {
+      if (!near || frame) return;
+      frame = requestAnimationFrame(pick);
+    };
+
+    const list = document.getElementById('rp-list');
+    if (list) {
+      new IntersectionObserver(
+        (entries) => {
+          near = entries.some((e) => e.isIntersecting);
+          if (near) pick();
+          else if (current !== -1) {
+            current = -1;
+            stages.forEach((s) => s.classList.remove('is-current'));
+          }
+        },
+        { rootMargin: '20% 0px' },
+      ).observe(list);
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+  }
+</script>
+
+<style>
+  /* Darker grid behind the pipeline section. This layer sits at 60% opacity, so
+     the shared .pattern-grid value lands near-invisible here; raised locally and
+     the site-wide token is left alone. */
+  .pipeline-grid.pattern-grid {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px);
+  }
+
+  /* --- stage label ----------------------------------------------------
+     Muted until this is the stage being read, then it warms to the accent
+     over a slow transition. Nothing flashes. */
+  .rp-label {
+    color: var(--color-ink-2);
+    transition: color 600ms var(--ease-out-quart);
+  }
+  .rp-index {
+    color: var(--color-ink-muted);
+    transition: color 600ms var(--ease-out-quart);
+  }
+  .rp-stage.is-current .rp-label { color: var(--color-accent-text); }
+
+  /* --- spine ---------------------------------------------------------- */
+  .rp-spine { position: relative; min-height: 100%; }
+
+  .rp-dot {
+    position: absolute;
+    top: 0.55rem;
+    left: 0;
+    height: 9px;
+    width: 9px;
+    border-radius: 9999px;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-bg-elevated);
+    transition: border-color 400ms ease-out, background-color 400ms ease-out, box-shadow 400ms ease-out;
+  }
+  @media (min-width: 1024px) {
+    .rp-dot { left: 0.25rem; }
+  }
+  /* A filled marker, not a glow. The spine reads as a measured scale. */
+  .rp-stage.is-seen .rp-dot {
+    border-color: var(--color-fig-mid);
+    background: var(--color-fig-bright);
+  }
+  /* Only the stage currently being read takes the accent. */
+  .rp-stage.is-current .rp-dot {
+    border-color: var(--color-accent-text);
+    background: var(--color-accent);
+  }
+
+  .rp-line {
+    position: absolute;
+    top: 1.6rem;
+    bottom: -0.55rem;
+    left: 4px;
+    width: 1px;
+    background: linear-gradient(to bottom, var(--color-fig-mid), var(--color-line));
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform 1100ms var(--ease-out-quart);
+  }
+  @media (min-width: 1024px) {
+    .rp-line { left: calc(0.25rem + 4px); }
+  }
+  .rp-stage.is-seen .rp-line { transform: scaleY(1); }
+
+  /* --- reveal --------------------------------------------------------- */
+  .rp-js .rp-copy,
+  .rp-js .rp-panel {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 700ms var(--ease-out-quart), transform 700ms var(--ease-out-quart);
+  }
+  .rp-panel { transition-delay: 90ms; }
+  .rp-stage.is-seen .rp-copy,
+  .rp-stage.is-seen .rp-panel {
+    opacity: 1;
+    transform: none;
+  }
+
+  .rp-frame { transition: border-color 500ms ease-out; }
+  .rp-stage.is-seen .rp-frame { border-color: var(--color-line-strong); }
+
+  /* Nothing here should be load-bearing for readability. */
+  @media (prefers-reduced-motion: reduce) {
+    .rp-js .rp-copy, .rp-js .rp-panel { transition: none; }
+    .rp-copy, .rp-panel { transition: none; }
+    .rp-line { transform: scaleY(1); transition: none; }
+    .rp-dot { transition: none; }
+  }
+</style>

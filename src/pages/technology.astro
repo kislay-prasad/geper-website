@@ -1,0 +1,218 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { technology } from '@/data/content';
+import SectionHeader from '@/components/ui/SectionHeader.astro';
+import Section from '@/components/sections/Section.astro';
+import NextStep from '@/components/sections/NextStep.astro';
+import StageTransect from '@/components/system/StageTransect.astro';
+import StagePlate from '@/components/system/StagePlate.astro';
+---
+<BaseLayout title="Technology" description="How GEPER organises biological data, computational representation, modelling and interpretation, explained conceptually.">
+  <Section pattern="grid" class="tech-hero">
+    <SectionHeader level="h1" eyebrow={technology.eyebrow} title={technology.headline} />
+
+    <div class="mt-7 lg:mt-8">
+      <StageTransect />
+    </div>
+  </Section>
+
+  <Section tone="elevated" labelledby="layers-title">
+    <h2 id="layers-title" class="sr-only">One variant's journey</h2>
+
+    <ol class="stage-ladder">
+      {technology.layers.map((L) => (
+        <li id={L.id} class="stage-row">
+          <div class="stage-row__mark">
+            <span class="stage-row__index">{L.index}</span>
+            <div class="stage-row__plate"><StagePlate stage={L.id} /></div>
+          </div>
+
+          <div class="stage-row__body">
+            <p class="stage-row__label label">{L.title}</p>
+            <h3 class="stage-row__question">{L.question}</h3>
+            <p class="stage-row__text">{L.body}</p>
+          </div>
+
+          <ul class="stage-row__items">
+            {L.items.map((it) => <li>{it}</li>)}
+          </ul>
+        </li>
+      ))}
+    </ol>
+  </Section>
+
+  <NextStep label="Next" title="The research behind the layers." body="Four connected research directions shape how GEPER represents, models and interprets genomic variation." href="/research" cta="Research" />
+</BaseLayout>
+
+<style>
+  /* Darker grid behind the Technology hero only. The shared Section pattern is
+     tuned for large washes and reads as almost nothing here. The whole selector
+     must be :global — the grid layer AND the .tech-hero section are both
+     rendered by Section.astro, so neither carries this page's scope id. */
+  :global(.tech-hero .pattern-grid) {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px);
+  }
+
+  .stage-ladder {
+    margin: 0 0 -0.5rem;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--color-line-faint);
+  }
+
+  .stage-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    padding: 1.75rem 0;
+    border-bottom: 1px solid var(--color-line-faint);
+    scroll-margin-top: 6rem;
+  }
+
+  /* A quiet scan line completing across the row on hover — the only motion here. */
+  .stage-row::after {
+    content: "";
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    height: 1px;
+    width: 0;
+    background: var(--color-accent);
+    transition: width 620ms var(--ease-out-quart);
+  }
+
+  .stage-row:hover::after,
+  .stage-row:focus-within::after,
+  .stage-row:target::after {
+    width: 100%;
+  }
+
+  .stage-row__mark {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .stage-row__index {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-accent-text);
+  }
+
+  /* The plate's ink travels as a custom property: Astro scopes classes per
+     component, so the row cannot style the SVG inside StagePlate directly. */
+  /* Each stage figure sits in its own cream-white cell with a grid behind it,
+     matching the transect band above and the research panels on the homepage. */
+  .stage-row__plate {
+    width: 100%;
+    max-width: 12rem;
+    min-width: 0;
+    padding: 0.5rem 0.55rem;
+    border: 1px solid var(--color-line-faint);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg-raised);
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.24) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.24) 1px, transparent 1px);
+    background-size: 24px 24px;
+    transition: border-color 200ms ease;
+    --plate-ink: var(--color-ink-muted);
+  }
+
+  .stage-row:hover .stage-row__plate,
+  .stage-row:focus-within .stage-row__plate,
+  .stage-row:target .stage-row__plate {
+    --plate-ink: var(--color-ink-2);
+    border-color: var(--color-line);
+  }
+
+  .stage-row__body {
+    min-width: 0;
+  }
+
+  .stage-row__label {
+    color: var(--color-ink-muted);
+  }
+
+  .stage-row__question {
+    margin-top: 0.6rem;
+    font-size: var(--text-h3);
+    line-height: var(--text-h3--line-height);
+    letter-spacing: var(--text-h3--letter-spacing);
+    font-weight: 600;
+    color: var(--color-ink);
+    text-wrap: balance;
+  }
+
+  .stage-row__text {
+    margin-top: 0.75rem;
+    max-width: 46rem;
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    color: var(--color-ink-2);
+  }
+
+  /* Supporting notes: annotations, not bullets. Nothing marks an item but the
+     space around it — so the gap between items has to stay clearly larger than
+     the leading inside one, or a wrapped line reads as a new point. */
+  .stage-row__items {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .stage-row__items li {
+    max-width: 46ch;
+    font-size: var(--text-body-sm);
+    line-height: 1.4;
+    color: var(--color-ink-muted);
+    text-wrap: pretty;
+  }
+
+  @media (min-width: 640px) {
+    .stage-row {
+      grid-template-columns: 10rem minmax(0, 1fr);
+      gap: 1.4rem 2.25rem;
+      padding: 1.75rem 0;
+    }
+
+    .stage-row__mark {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.9rem;
+    }
+
+    .stage-row__index {
+      width: 100%;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--color-line-faint);
+    }
+
+    .stage-row__items {
+      grid-column: 2;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .stage-row {
+      grid-template-columns: 12rem minmax(0, 1fr) minmax(0, 21rem);
+      gap: 2.25rem;
+      padding: 2.1rem 0;
+    }
+
+    .stage-row__items {
+      grid-column: 3;
+      margin-top: 0;
+    }
+  }
+</style>

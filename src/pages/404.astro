@@ -1,0 +1,33 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Section from '@/components/sections/Section.astro';
+import Button from '@/components/ui/Button.astro';
+import { nav } from '@/data/site';
+---
+<BaseLayout title="Page not found" noindex description="The page you requested does not exist.">
+  <Section pattern="grid" class="nf-page">
+    <p class="label text-ink-muted">404</p>
+    <h1 class="mt-4 text-h1 text-ink">This page does not exist.</h1>
+    <p class="mt-4 max-w-prose text-body text-ink-2">The address may be mistyped, or the page may have moved. Here is where you can go instead.</p>
+    <ul class="mt-8 flex flex-wrap gap-3">
+      <li><Button href="/" variant="ghost">Home</Button></li>
+      {nav.map((n) => <li><Button href={n.href} variant="ghost">{n.label}</Button></li>)}
+    </ul>
+  </Section>
+</BaseLayout>
+
+<style>
+  /* Brings the 404 background in line with the rest of the finalised site: the
+     shared .pattern-grid value is the faint one this page was left on, while
+     every other page now renders its grid at 0.28. Drawn from --grid-ink so it
+     still inverts with the theme; the site-wide token is unchanged.
+
+     The whole selector must be :global — the grid layer AND the .nf-page
+     section are both rendered by Section.astro, so neither carries this page's
+     scope id. */
+  :global(.nf-page .pattern-grid) {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px);
+  }
+</style>
