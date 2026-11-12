@@ -3,7 +3,7 @@ import type { Status } from './site';
 /* -------------------------------------------------------------- HOME */
 
 export const home = {
-  eyebrow: 'Computational genomics · Chennai, India',
+  eyebrow: 'Computational genomics',
   headline: 'Building the Future of Genomic Intelligence.',
   explanation:
     'GEPER develops computational systems for interpreting genomic variation, combining genomics, computational biology and artificial intelligence so that biological data becomes understandable, evidence-backed insight for the people who need it.',
@@ -225,7 +225,7 @@ export const platform = {
 export const about = {
   eyebrow: 'About GEPER',
   headline: 'Building the Future of Genomic Intelligence.',
-  lead: 'GEPER is a deep-tech company working at the intersection of genomics, computation and artificial intelligence. We are early, we are building from Chennai, India, and we are building for the long term.',
+  lead: 'GEPER is a deep-tech company working at the intersection of genomics, computation, and artificial intelligence. We are early, ambitious, and building for the long term.',
 
   why: {
     eyebrow: 'Why we exist',

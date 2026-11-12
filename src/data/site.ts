@@ -17,7 +17,6 @@ export const site = {
   contactEmail: import.meta.env.PUBLIC_CONTACT_EMAIL || 'contact@geper.in',
   contactEndpoint: import.meta.env.PUBLIC_CONTACT_ENDPOINT || '/api/contact',
   analyticsSrc: import.meta.env.PUBLIC_ANALYTICS_SRC || '',
-  location: 'Chennai, India',
   founded: '2026',
   copyrightYear: new Date().getFullYear(),
   /* Date this revision of the legal pages was published. Bump it whenever the
