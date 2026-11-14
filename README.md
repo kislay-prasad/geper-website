@@ -29,7 +29,7 @@ Values are read at build time.
 `worker/index.ts` routes `POST /api/contact` to `worker/contact.ts`, which emails enquiries via Resend. All pages are
 served as static assets from `dist/` (see `wrangler.jsonc`); only `/api/*` runs Worker code.
 Server-side env vars (Worker → Settings → Variables and Secrets, or `wrangler secret put RESEND_API_KEY`; locally `.dev.vars`):
-`RESEND_API_KEY` (secret, required), `CONTACT_TO` (default `mailgeper@gmail.com`), `CONTACT_FROM` (default
+`RESEND_API_KEY` (secret, required), `CONTACT_TO` (default `contact@geper.in`), `CONTACT_FROM` (default
 `GEPER Website <onboarding@resend.dev>`; set to e.g. `GEPER Website <contact@geper.in>` once the domain is verified in
 Resend), `ALLOWED_ORIGINS` (optional).
 

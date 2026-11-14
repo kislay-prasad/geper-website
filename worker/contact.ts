@@ -6,7 +6,7 @@
  *
  * Environment (Worker → Settings → Variables and Secrets; locally .dev.vars):
  *   RESEND_API_KEY  (secret, required)
- *   CONTACT_TO      (optional, default mailgeper@gmail.com)
+ *   CONTACT_TO      (optional, default contact@geper.in)
  *   CONTACT_FROM    (optional, default "GEPER Website <onboarding@resend.dev>";
  *                    switch to e.g. "GEPER Website <contact@geper.in>" once geper.in is verified)
  *   ALLOWED_ORIGINS (optional, comma-separated origins; same-origin is always allowed)
@@ -21,7 +21,7 @@ export interface Env {
   RESEND_API_URL?: string;
 }
 
-const DEFAULT_TO = 'mailgeper@gmail.com';
+const DEFAULT_TO = 'contact@geper.in';
 const DEFAULT_FROM = 'GEPER Website <onboarding@resend.dev>';
 const CATEGORIES: Record<string, string> = {
   research: 'Research collaboration',
