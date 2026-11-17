@@ -4,7 +4,7 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-11-11",
   "vars": {
-    "CONTACT_FROM": "GEPER Website <contact@geper.in>",
+    "CONTACT_FROM": "GEPER Website <website@notify.geper.in>",
     "CONTACT_TO": "contact@geper.in"
   },
   "assets": {

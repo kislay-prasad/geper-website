@@ -30,8 +30,11 @@ Values are read at build time.
 served as static assets from `dist/` (see `wrangler.jsonc`); only `/api/*` runs Worker code.
 Server-side env vars (Worker → Settings → Variables and Secrets, or `wrangler secret put RESEND_API_KEY`; locally `.dev.vars`):
 `RESEND_API_KEY` (secret, required), `CONTACT_TO` (default `contact@geper.in`), `CONTACT_FROM` (default
-`GEPER Website <onboarding@resend.dev>`; set to e.g. `GEPER Website <contact@geper.in>` once the domain is verified in
-Resend), `ALLOWED_ORIGINS` (optional).
+`GEPER Website <onboarding@resend.dev>`; production is configured as `GEPER Website <website@notify.geper.in>` in `wrangler.jsonc`),
+`ALLOWED_ORIGINS` (optional).
+
+The mail host rejects messages sent from outside servers that claim to be from an `@geper.in` address (`554 internal domain use`).
+Always send from the `notify.geper.in` subdomain; the configured sender is `website@notify.geper.in`.
 
 Local test (site + API): `npm run dev:worker` → http://localhost:8787/contact (`npm run dev` does NOT run the Worker, so the
 form 404s there). Without a real key, use `npm run mock:resend` plus a `.dev.vars` containing `RESEND_API_KEY=re_mock` and
@@ -82,6 +85,6 @@ src/
   data/                site.ts (identity, nav, backbone), content.ts (page copy)
   styles/global.css    design tokens (@theme) and base styles
   pages/               index, technology, research, platform, about, contact, privacy, terms, 404
-scripts/verify-dist.mjs  post-build guard
-public/brand, public/favicon*.png, public/apple-touch-icon.png
+ scripts/verify-dist.mjs  post-build guard
+ public/brand, public/favicon*.png, public/apple-touch-icon.png
 ```
