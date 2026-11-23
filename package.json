@@ -11,7 +11,8 @@
     "verify": "node scripts/verify-dist.mjs",
     "dev:worker": "npm run build && wrangler dev --port 8787",
     "deploy": "npm run build && wrangler deploy",
-    "mock:resend": "node scripts/mock-resend.mjs"
+    "mock:resend": "node scripts/mock-resend.mjs",
+    "start": "node server.mjs"
   },
   "dependencies": {
     "astro": "^7.2.9",
@@ -26,5 +27,8 @@
     "@types/three": "^0.180.0",
     "tailwindcss": "^4.3.3",
     "wrangler": "^4.160.0"
+  },
+  "engines": {
+    "node": ">=22.18.0"
   }
 }
