@@ -216,6 +216,7 @@ const formAttrs = mode === 'endpoint'
     const tsBox = form.querySelector<HTMLElement>('[data-turnstile-box]');
     let widgetId: string | null = null;
     let token = '';
+    let needsInteraction = false;
     let waiters: Array<(t: string) => void> = [];
 
     const gotToken = (t: string) => {
@@ -232,7 +233,11 @@ const formAttrs = mode === 'endpoint'
         theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
         'response-field': false,
         // The slot stays hidden until Cloudflare actually needs the visitor to interact.
-        'before-interactive-callback': () => tsBox.classList.remove('invisible'),
+        'before-interactive-callback': () => {
+          needsInteraction = true;
+          tsBox.classList.remove('invisible');
+        },
+        'after-interactive-callback': () => { needsInteraction = false; },
         callback: gotToken,
         'expired-callback': () => { token = ''; },
         'error-callback': () => { token = ''; },
@@ -328,12 +333,16 @@ const formAttrs = mode === 'endpoint'
       setBusy(true);
       const ctrl = new AbortController();
       let timer = 0;
+      let tokenUsed = false;
       try {
-        const turnstileToken = await getToken(10_000);
+        // If Cloudflare is waiting for the visitor to tick the box, say so at once instead of waiting.
+        const turnstileToken = await getToken(needsInteraction ? 0 : 10_000);
         if (siteKey && !turnstileToken) {
-          failWithFallback('We could not confirm that this message was sent by a person. Please try again in a moment.');
+          if (needsInteraction) setStatus('err', 'Please complete the “Verify you are human” check, then send the message again.');
+          else failWithFallback('We could not confirm that this message was sent by a person. Please try again in a moment.');
           return;
         }
+        tokenUsed = !!turnstileToken;
         timer = window.setTimeout(() => ctrl.abort(), 15000);
         const res = await fetch(endpoint, {
           method: 'POST',
@@ -363,7 +372,7 @@ const formAttrs = mode === 'endpoint'
         failWithFallback((e as Error).name === 'AbortError' ? 'The request timed out. Check your connection and try again.' : 'The message could not be sent. Check your connection and try again.');
       } finally {
         window.clearTimeout(timer);
-        resetToken();
+        if (tokenUsed) resetToken();
         inFlight = false;
         setBusy(false);
       }
