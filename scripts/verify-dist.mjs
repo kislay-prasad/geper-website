@@ -4,10 +4,12 @@
  *   2. Placeholder/broken navigation (href="#" in nav/footer, links to pages that were not built)
  *   3. Missing local assets referenced by <img>, <script>, <link>
  *   4. Unsupported claims that must never appear in production copy
+ *   5. Canonical URLs that are not the served URL, missing social image, sitemap, robots.txt,
+ *      favicon.ico, or a dist/_headers without a Content-Security-Policy
  * Run automatically by `npm run build`.
  */
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
-import { join, relative, extname, dirname, resolve } from 'node:path';
+import { join, relative, extname, resolve } from 'node:path';
 
 const DIST = resolve(process.cwd(), 'dist');
 if (!existsSync(DIST)) { console.error('verify-dist: dist/ not found — run astro build first'); process.exit(1); }
@@ -54,6 +56,7 @@ const FORBIDDEN_CLAIMS = [
   [/\bCE[- ]marked\b/i, 'regulatory claim'],
   [/\bcertified medical device\b(?!\.)/i, 'device claim (allowed only in negation)'],
   [/\bcoming soon\b/i, 'vague "coming soon" copy'],
+  [/\bavailable\b[^.]{0,60}\bsoon\b/i, 'vague availability-date copy ("available … soon")'],
   [/\bSystems Operational\b/i, 'fake live status'],
   [/\bGlobal (HQ|Headquarters)\b/i, 'fake HQ claim'],
   [/\bwet[- ]lab\b/i, 'wet-lab claim'],
@@ -115,12 +118,36 @@ for (const f of html) {
 }
 
 /* 4 ─ Required routes */
-for (const r of ['/', '/technology', '/research', '/platform', '/about', '/contact', '/privacy', '/terms', '/404']) {
+for (const r of ['/', '/technology', '/research', '/platform', '/about', '/contact', '/privacy', '/terms', '/404', '/message-sent']) {
   if (!builtRoutes.has(r)) failures.push(`required route not built: ${r}`);
+}
+
+/* 5 ─ Canonical URLs, social metadata and generated files */
+for (const f of html) {
+  const s = readFileSync(f, 'utf8');
+  const rel = relative(DIST, f).replace(/\\/g, '/');
+  const canonical = /<link rel="canonical" href="([^"]+)"/.exec(s)?.[1];
+  if (rel === '404.html') {
+    if (canonical) fail(f, 'the 404 page must not declare a canonical URL');
+  } else if (!canonical) {
+    fail(f, 'missing canonical URL');
+  } else if (/\.html$|\/index$/.test(canonical)) {
+    fail(f, `canonical URL is not the URL the page is served at: ${canonical}`);
+  }
+  const ogImage = /<meta property="og:image" content="([^"]+)"/.exec(s)?.[1];
+  if (!ogImage) fail(f, 'missing og:image');
+  else if (!assetPaths.has(new URL(ogImage).pathname)) fail(f, `og:image file not built: ${ogImage}`);
+}
+for (const required of ['/sitemap.xml', '/robots.txt', '/favicon.ico']) {
+  if (!assetPaths.has(required)) failures.push(`required file not built: ${required}`);
+}
+const headersFile = join(DIST, '_headers');
+if (!existsSync(headersFile) || !/Content-Security-Policy:/.test(readFileSync(headersFile, 'utf8'))) {
+  failures.push('dist/_headers missing or has no Content-Security-Policy (scripts/gen-headers.mjs must run first)');
 }
 
 if (failures.length) {
   console.error(`\nverify-dist: ${failures.length} problem(s)\n` + failures.map((x) => '  ✗ ' + x).join('\n') + '\n');
   process.exit(1);
 }
-console.log(`verify-dist: OK — ${html.length} pages, ${files.length} files, no Stitch remnants, no forbidden claims, no broken links.`);
+console.log(`verify-dist: OK — ${html.length} pages, ${files.length} files, no Stitch remnants, no forbidden claims, no broken links, canonical URLs and headers in place.`);

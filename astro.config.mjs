@@ -3,7 +3,7 @@ import { defineConfig } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  site: process.env.PUBLIC_SITE_URL || 'https://www.geper.example',
+  site: process.env.PUBLIC_SITE_URL || 'https://geper.in',
   output: 'static',
   trailingSlash: 'never',
   build: { format: 'file' },

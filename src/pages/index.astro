@@ -4,7 +4,6 @@ import { home, research } from '@/data/content';
 import { site } from '@/data/site';
 import Button from '@/components/ui/Button.astro';
 import Eyebrow from '@/components/ui/Eyebrow.astro';
-import CapabilityCard from '@/components/cards/CapabilityCard.astro';
 import DnaNarrative from '@/components/hero/DnaNarrative.astro';
 import Section from '@/components/sections/Section.astro';
 import NextStep from '@/components/sections/NextStep.astro';
@@ -65,7 +64,7 @@ import NextStep from '@/components/sections/NextStep.astro';
                       const isMissing = itemIndex >= 10 && itemIndex <= 15;
 
                       return (
-                        <g key={itemIndex} class="genomic-cell" transform={`translate(${x} ${y})`}>
+                        <g class="genomic-cell" transform={`translate(${x} ${y})`}>
                           {!isMissing && (
                             <>
                               <rect class="genomic-block" x="-7.5" y="-6" width="15" height="12" rx="3" />
@@ -111,7 +110,7 @@ import NextStep from '@/components/sections/NextStep.astro';
                       const x = 120 + itemIndex * 13;
                       const y = 46 + (itemIndex % 3) * 14;
                       return (
-                        <g key={itemIndex} class="genomic-rebuild-cell" transform={`translate(${x} ${y})`}>
+                        <g class="genomic-rebuild-cell" transform={`translate(${x} ${y})`}>
                           <rect class="genomic-rebuild-block" x="-7.5" y="-6" width="15" height="12" rx="3" />
                           <circle r="2.7" fill={['#7c94d0', '#ca7b74', '#b8a962', '#6f8d67'][itemIndex % 4]} />
                         </g>
@@ -224,7 +223,9 @@ import NextStep from '@/components/sections/NextStep.astro';
           const inView = (viewport - rect.top) / (rect.height + viewport * 0.4);
           const active = inView > 0.15;
           item.classList.toggle('is-active', active);
-          item.style.opacity = String(Math.max(0.65, Math.min(1, 0.65 + inView * 0.35)));
+          // Only the decorative figure fades with scroll; the text always keeps full contrast.
+          const art = item.querySelector<HTMLElement>('.research-item__art');
+          if (art) art.style.opacity = String(Math.max(0.65, Math.min(1, 0.65 + inView * 0.35)));
         });
       };
 
@@ -432,12 +433,7 @@ import NextStep from '@/components/sections/NextStep.astro';
       align-items: center;
       padding: 0.7rem 0;
       border-top: 1px solid rgb(69 70 77 / 0.25);
-      opacity: 0.7;
-      transition: opacity 220ms ease, transform 220ms ease;
-    }
-
-    .research-item.is-visible {
-      opacity: 1;
+      transition: transform 220ms ease;
     }
 
     .research-item.is-active {

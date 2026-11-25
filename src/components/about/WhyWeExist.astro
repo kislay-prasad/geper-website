@@ -26,7 +26,8 @@ const originY = (H - (ROWS - 1) * PITCH) / 2;
    as one structure rather than as background texture. */
 type Cell = {
   x: number; y: number; sx: number; sy: number; size: number;
-  core: boolean; op: number; dur: number; delay: number;
+  core: boolean; tone: '' | 'signal' | 'bio' | 'proc' | 'mark';
+  op: number; dur: number; delay: number;
 };
 const cells: Cell[] = [];
 for (let r = 0; r < ROWS; r++) {

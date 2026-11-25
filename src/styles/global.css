@@ -32,7 +32,9 @@
   /* Text */
   --color-ink: #17161a;
   --color-ink-2: #3b3a42;
-  --color-ink-muted: #6a6971;
+  /* ink-muted holds at least 4.5:1 on every light surface, surface-high included.
+     ink-faint is for decorative strokes and dashes only, never for text. */
+  --color-ink-muted: #5f5e66;
   --color-ink-faint: #93919a;
 
   /* Accent — blue, matched to the GEPER mark, and now reserved for it.
@@ -46,7 +48,7 @@
 
   /* Data semantics only — never decoration. Darkened for a light ground:
      the dark theme's yellow and red are unreadable on cream. */
-  --color-data-warn: #8a6408;
+  --color-data-warn: #795807; /* 4.5:1 or better as badge text on its own 8% tint */
   --color-data-critical: #b42318;
   --color-data-neutral: #565b6b;
 

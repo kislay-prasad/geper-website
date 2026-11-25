@@ -7,6 +7,13 @@ export const STATUS_LABEL: Record<Status, string> = {
   'out-of-scope': 'Outside current scope',
 };
 
+/**
+ * Public path of a built page. Pages are built as files (about.html), so Astro.url.pathname
+ * ends in .html; the site serves them without it: /about.html → /about, /index.html → /.
+ */
+export const pagePath = (pathname: string) =>
+  pathname.replace(/\.html$/, '').replace(/\/index$/, '/').replace(/(.)\/+$/, '$1') || '/';
+
 export const site = {
   name: 'GEPER',
   legalName: 'GEPER CORPORATION',
@@ -19,10 +26,16 @@ export const site = {
   analyticsSrc: import.meta.env.PUBLIC_ANALYTICS_SRC || '',
   founded: '2026',
   copyrightYear: new Date().getFullYear(),
-  /* Date this revision of the legal pages was published. Bump it whenever the
-     terms change — it is shown to visitors, so a stale value is worse than
-     none. Set to an empty string to hide the line entirely. */
-  legalUpdated: import.meta.env.PUBLIC_LEGAL_UPDATED || '2026-09-01',
+  /* Publication date of each legal page, shown to visitors. Bump the matching
+     date whenever that page's wording changes: a stale date is worse than none. */
+  privacyUpdated: import.meta.env.PUBLIC_PRIVACY_UPDATED || '2026-11-25',
+  termsUpdated: import.meta.env.PUBLIC_TERMS_UPDATED || '2026-09-01',
+  /* Public Turnstile site key (safe to publish). The matching secret lives only
+     in the Worker as TURNSTILE_SECRET_KEY. Empty disables the widget. */
+  turnstileSiteKey: import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? '0x4AAAAAAGSDpeY3tkky_mSz',
+  /* Social preview image (1200×630), relative to the site root. */
+  ogImage: '/og/geper-og.png',
+  ogImageAlt: 'GEPER — Building the Future of Genomic Intelligence.',
 } as const;
 
 export const nav = [

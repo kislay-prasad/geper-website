@@ -1,0 +1,35 @@
+---
+/**
+ * Confirmation for contact-form messages sent without JavaScript. The Worker
+ * answers a successful native form post with a 303 to this page, so a refresh
+ * can never send the same message twice. Not linked from anywhere, not indexed.
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Section from '@/components/sections/Section.astro';
+import Button from '@/components/ui/Button.astro';
+import { site } from '@/data/site';
+---
+<BaseLayout title="Message sent" noindex description="Your message to GEPER has been sent.">
+  <Section pattern="grid" class="ms-page">
+    <p class="label text-ink-muted">Contact</p>
+    <h1 class="mt-4 text-h1 text-ink">Message sent.</h1>
+    <p class="mt-4 max-w-prose text-body text-ink-2">
+      Thank you. Your message has reached GEPER and a reply will come to the email address you gave.
+      If you need to add anything, write to <a href={`mailto:${site.contactEmail}`} class="text-accent-text underline underline-offset-4 hover:text-ink">{site.contactEmail}</a>.
+    </p>
+    <ul class="mt-8 flex flex-wrap gap-3">
+      <li><Button href="/" variant="ghost">Home</Button></li>
+      <li><Button href="/research" variant="ghost">Research</Button></li>
+      <li><Button href="/platform" variant="ghost">Platform</Button></li>
+    </ul>
+  </Section>
+</BaseLayout>
+
+<style>
+  /* Same background grid weight as the 404 and legal pages. */
+  :global(.ms-page .pattern-grid) {
+    background-image:
+      linear-gradient(to right, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--grid-ink) / 0.28) 1px, transparent 1px);
+  }
+</style>

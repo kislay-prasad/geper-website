@@ -12,11 +12,14 @@ import Section from '@/components/sections/Section.astro';
 import Eyebrow from '@/components/ui/Eyebrow.astro';
 import { site } from '@/data/site';
 
-const updated = site.legalUpdated
-  ? new Date(site.legalUpdated).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+const updated = site.privacyUpdated
+  ? new Date(site.privacyUpdated).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   : '';
 
-const clauses = [
+type Para = { lead?: string; body: string };
+type Clause = { index: string; title: string; paras: Para[]; note?: string };
+
+const clauses: Clause[] = [
   {
     index: '01',
     title: 'Customer data and derived outputs',
@@ -43,7 +46,16 @@ const clauses = [
       { lead: 'Access.', body: 'Access to customer data is restricted to the personnel and systems required to operate, secure, maintain or support the contracted service.' },
       { lead: 'Disclosure.', body: 'Customer data may be disclosed only where necessary to provide the contracted service, where required by law, or where otherwise authorised by the applicable agreement.' },
       { lead: 'Retention.', body: 'Retention and deletion are governed by the applicable service agreement together with operational and legal requirements.' },
-      { lead: 'Website enquiries.', body: 'The name, address, organisation and message submitted through this website are used only to respond to the person who sent them.' },
+    ],
+  },
+  {
+    index: '04',
+    title: 'This website',
+    paras: [
+      { lead: 'Website enquiries.', body: 'The name, email address, organisation and message submitted through the contact form are used only to respond to the person who sent them.' },
+      { lead: 'Hosting.', body: 'The website is served through Cloudflare, which processes technical request data, such as IP addresses, to deliver the site and protect it from abuse.' },
+      { lead: 'Contact form.', body: 'Messages sent through the contact form are delivered to GEPER’s mailbox by Resend, an email delivery service. Cloudflare Turnstile checks that a submission comes from a person, and the sender’s IP address is used briefly to limit repeated submissions.' },
+      { lead: 'Cookies and storage.', body: 'The website does not use advertising or analytics cookies. If you choose a light or dark theme, that choice is saved in your browser’s local storage and is not sent to GEPER.' },
     ],
   },
 ];
@@ -61,7 +73,7 @@ const clauses = [
     <div class="pv-col pv-doc mt-10 border-t border-line pt-8 md:mt-12">
       {updated && (
         <p class="label text-ink-muted">
-          Last updated <time datetime={site.legalUpdated}>{updated}</time>
+          Last updated <time datetime={site.privacyUpdated}>{updated}</time>
         </p>
       )}
 
@@ -86,7 +98,7 @@ const clauses = [
         ))}
 
         <li class="pv-clause">
-          <span class="label pt-1.5 text-accent-text" aria-hidden="true">04</span>
+          <span class="label pt-1.5 text-accent-text" aria-hidden="true">05</span>
           <div>
             <h2 class="text-h3 text-ink">Contact</h2>
             <p class="mt-3 max-w-prose text-body text-ink-2">

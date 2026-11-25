@@ -5,6 +5,11 @@
  *  - PUBLIC_CONTACT_ENDPOINT empty → opens the visitor's email client (mailto) with the
  *    drafted message. The submit label says so; the confirmation states what
  *    happened. No simulated success anywhere.
+ *
+ * Without JavaScript (or if the script fails) the form still works: it posts to the same
+ * endpoint as a normal form, the Worker answers with a plain page, and nothing is ever
+ * placed in the URL. Turnstile needs JavaScript, so in that case the page explains how to
+ * send the message by email instead.
  * See README "Contact endpoint contract" for the request/response shape.
  */
 import { contact } from '@/data/content';
@@ -13,10 +18,14 @@ import Button from '@/components/ui/Button.astro';
 import Icon from '@/components/ui/Icon.astro';
 const endpoint = site.contactEndpoint;
 const mode = endpoint ? 'endpoint' : 'mailto';
-const field = 'w-full rounded-md border border-line-strong bg-bg px-4 py-3 font-mono text-meta text-ink placeholder:text-ink-faint focus:border-accent-text focus:outline-none aria-[invalid=true]:border-data-critical';
+const turnstileKey = mode === 'endpoint' ? site.turnstileSiteKey : '';
+const field = 'w-full rounded-md border border-line-strong bg-bg px-4 py-3 font-mono text-meta text-ink placeholder:text-ink-muted focus:border-accent-text focus:outline-none aria-[invalid=true]:border-data-critical';
 const lab = 'label text-ink-2';
+const formAttrs = mode === 'endpoint'
+  ? { method: 'post', action: endpoint }
+  : { method: 'post', action: `mailto:${site.contactEmail}`, enctype: 'text/plain' };
 ---
-<form id="contact-form" class="flex flex-col gap-6" novalidate data-mode={mode} data-endpoint={endpoint} data-email={site.contactEmail}>
+<form id="contact-form" class="flex flex-col gap-6" {...formAttrs} data-mode={mode} data-endpoint={endpoint} data-email={site.contactEmail} data-turnstile={turnstileKey}>
   <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
     <div class="flex flex-col gap-2">
       <label for="name" class={lab}>Full name</label>
@@ -62,19 +71,26 @@ const lab = 'label text-ink-2';
     <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
   </div>
 
+  <!-- Turnstile: stays invisible unless Cloudflare needs the visitor to click once. -->
+  {turnstileKey && <div data-turnstile-box class="flex justify-end empty:hidden"></div>}
+
   <div class="flex flex-col gap-4 border-t border-line-faint pt-6 md:flex-row md:items-center md:justify-end">
     <Button type="submit" icon="arrow-right" id="contact-submit">{mode === 'mailto' ? 'Open in email' : 'Send Message'}</Button>
   </div>
 
-  <!-- Status region -->
-  <div id="form-status" class="hidden rounded-md border p-4 text-body-sm" role="status" aria-live="polite">
+  <!-- Announcements for screen readers. Always in the DOM (a live region that
+       appears at the same moment as its text is often not read out). -->
+  <p id="form-live" class="sr-only" role="status" aria-live="polite"></p>
+
+  <!-- Status box (visual) -->
+  <div id="form-status" class="hidden rounded-md border p-4 text-body-sm">
     <div class="flex items-start gap-3">
       <span data-icon-ok class="hidden text-accent-text"><Icon name="check" size={18} /></span>
       <span data-icon-err class="hidden text-data-critical"><Icon name="alert" size={18} /></span>
       <div class="flex-1">
         <p data-status-text class="text-ink"></p>
         <p data-status-fallback class="mt-2 hidden">
-          <a data-fallback-link href="#" class="inline-flex items-center gap-1 text-accent-text underline underline-offset-4"><span data-fallback-text>Send it by email instead</span><span data-fallback-arrow class="hidden"><Icon name="arrow-right" size={14} /></span><span data-fallback-ext><Icon name="external" size={14} /></span></a>
+          <a data-fallback-link href={`mailto:${site.contactEmail}`} class="inline-flex items-center gap-1 text-accent-text underline underline-offset-4"><span data-fallback-text>Send it by email instead</span><span data-fallback-arrow class="hidden"><Icon name="arrow-right" size={14} /></span><span data-fallback-ext><Icon name="external" size={14} /></span></a>
         </p>
       </div>
     </div>
@@ -82,14 +98,25 @@ const lab = 'label text-ink-2';
 </form>
 
 <script>
+  type TurnstileApi = {
+    render(el: HTMLElement, opts: Record<string, unknown>): string;
+    getResponse(id?: string): string | undefined;
+    reset(id?: string): void;
+  };
+  type TurnstileWindow = Window & { turnstile?: TurnstileApi; geperTurnstileReady?: () => void };
+
   const form = document.getElementById('contact-form') as HTMLFormElement | null;
   if (form) {
+    // Native validation stays on for visitors without JavaScript; this script validates itself.
+    form.noValidate = true;
     const mode = form.dataset.mode as 'endpoint' | 'mailto';
     const endpoint = form.dataset.endpoint || '';
     const email = form.dataset.email || '';
+    const siteKey = form.dataset.turnstile || '';
     const submit = form.querySelector<HTMLButtonElement>('#contact-submit')!;
     const submitLabel = submit.innerHTML;
     const status = form.querySelector<HTMLElement>('#form-status')!;
+    const live = form.querySelector<HTMLElement>('#form-live')!;
     const statusText = status.querySelector<HTMLElement>('[data-status-text]')!;
     const statusFallback = status.querySelector<HTMLElement>('[data-status-fallback]')!;
     const fallbackLink = status.querySelector<HTMLAnchorElement>('[data-fallback-link]')!;
@@ -109,6 +136,16 @@ const lab = 'label text-ink-2';
     const count = form.querySelector<HTMLElement>('[data-count]')!;
 
     message.addEventListener('input', () => (count.textContent = String(message.value.length)));
+
+    /* crypto.randomUUID only exists on secure (https) pages; getRandomValues works everywhere. */
+    const uuid = (): string => {
+      if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+      const b = crypto.getRandomValues(new Uint8Array(16));
+      b[6] = (b[6] & 0x0f) | 0x40;
+      b[8] = (b[8] & 0x3f) | 0x80;
+      const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+      return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+    };
 
     type Field = 'name' | 'email' | 'inquiryType' | 'message';
     const fields: Field[] = ['name', 'email', 'inquiryType', 'message'];
@@ -130,19 +167,34 @@ const lab = 'label text-ink-2';
       return e;
     };
 
+    const setFieldError = (f: Field, text?: string) => {
+      el(f).setAttribute('aria-invalid', String(!!text));
+      err(f).textContent = text ?? '';
+      err(f).classList.toggle('hidden', !text);
+    };
+
+    /* Used on submit only: shows every error and moves focus to the first one. */
     const showErrors = (e: Partial<Record<Field, string>>) => {
       let first: Field | null = null;
       for (const f of fields) {
-        const has = !!e[f];
-        el(f).setAttribute('aria-invalid', String(has));
-        err(f).textContent = e[f] ?? '';
-        err(f).classList.toggle('hidden', !has);
-        if (has && !first) first = f;
+        setFieldError(f, e[f]);
+        if (e[f] && !first) first = f;
       }
       if (first) el(first).focus();
       return !first;
     };
-    fields.forEach((f) => el(f).addEventListener('input', () => { if (el(f).getAttribute('aria-invalid') === 'true') showErrors({ ...validate(), ...(validate()[f] ? {} : { [f]: undefined }) }); }));
+
+    /* While typing, only the field being edited is re-checked, and focus never moves. */
+    fields.forEach((f) =>
+      el(f).addEventListener('input', () => {
+        if (el(f).getAttribute('aria-invalid') === 'true') setFieldError(f, validate()[f]);
+      }),
+    );
+
+    const announce = (text: string) => {
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = text), 60);
+    };
 
     const setStatus = (kind: 'ok' | 'err' | 'none', text = '', withFallback = false) => {
       status.classList.toggle('hidden', kind === 'none');
@@ -152,15 +204,76 @@ const lab = 'label text-ink-2';
       iconErr.classList.toggle('hidden', kind !== 'err');
       statusText.textContent = text;
       statusFallback.classList.toggle('hidden', !withFallback);
-      if (kind !== 'none') status.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      if (kind !== 'none') {
+        announce(text);
+        status.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    };
+
+    /* ---------------- Turnstile ---------------- */
+    const w = window as TurnstileWindow;
+    const tsBox = form.querySelector<HTMLElement>('[data-turnstile-box]');
+    let widgetId: string | null = null;
+    let token = '';
+    let waiters: Array<(t: string) => void> = [];
+
+    const gotToken = (t: string) => {
+      token = t;
+      waiters.splice(0).forEach((resolve) => resolve(t));
+    };
+
+    const renderWidget = () => {
+      if (!w.turnstile || !tsBox || widgetId !== null) return;
+      widgetId = w.turnstile.render(tsBox, {
+        sitekey: siteKey,
+        action: 'contact',
+        appearance: 'interaction-only',
+        theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
+        'response-field': false,
+        callback: gotToken,
+        'expired-callback': () => { token = ''; },
+        'error-callback': () => { token = ''; },
+      });
+    };
+
+    if (mode === 'endpoint' && siteKey && tsBox) {
+      if (w.turnstile) renderWidget();
+      else {
+        w.geperTurnstileReady = renderWidget;
+        const s = document.createElement('script');
+        s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=geperTurnstileReady';
+        s.async = true;
+        s.defer = true;
+        document.head.appendChild(s);
+      }
+    }
+
+    /* A token normally exists within a second or two of the page loading; wait briefly if not. */
+    const getToken = (waitMs: number) =>
+      new Promise<string>((resolve) => {
+        if (!siteKey) return resolve('');
+        const current = token || (w.turnstile && widgetId !== null ? w.turnstile.getResponse(widgetId) ?? '' : '');
+        if (current) return resolve(current);
+        const done = (t: string) => { window.clearTimeout(timer); resolve(t); };
+        const timer = window.setTimeout(() => {
+          waiters = waiters.filter((x) => x !== done);
+          resolve('');
+        }, waitMs);
+        waiters.push(done);
+      });
+
+    /* Tokens are single-use: get a fresh one after every attempt. */
+    const resetToken = () => {
+      token = '';
+      if (w.turnstile && widgetId !== null) w.turnstile.reset(widgetId);
     };
 
     /* One id per attempt; the server passes it to Resend as an idempotency key so a
        retry or double-click of the same message cannot email twice. Renewed after success. */
-    let submissionId = crypto.randomUUID();
+    let submissionId = uuid();
     let inFlight = false;
 
-    const payload = () => ({
+    const payload = (turnstileToken = '') => ({
       name: el('name').value.trim(),
       email: el('email').value.trim(),
       organization: (form.querySelector<HTMLInputElement>('#organization')!.value || '').trim() || undefined,
@@ -169,6 +282,7 @@ const lab = 'label text-ink-2';
       website: (form.querySelector<HTMLInputElement>('#website')!.value || ''),
       submittedAt: new Date().toISOString(),
       submissionId,
+      turnstileToken,
     });
 
     const mailtoHref = () => {
@@ -177,6 +291,12 @@ const lab = 'label text-ink-2';
       const subject = `[GEPER] ${typeLabel} — ${p.name}`;
       const body = `${p.message}\n\n—\n${p.name}${p.organization ? `\n${p.organization}` : ''}\n${p.email}`;
       return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    };
+
+    const failWithFallback = (text: string) => {
+      fallbackLink.href = mailtoHref();
+      setFallback('Send it by email instead', false);
+      setStatus('err', text, true);
     };
 
     const setBusy = (busy: boolean) => {
@@ -204,40 +324,43 @@ const lab = 'label text-ink-2';
       inFlight = true;
       setBusy(true);
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 15000);
+      let timer = 0;
       try {
+        const turnstileToken = await getToken(10_000);
+        if (siteKey && !turnstileToken) {
+          failWithFallback('We could not confirm that this message was sent by a person. Please try again in a moment.');
+          return;
+        }
+        timer = window.setTimeout(() => ctrl.abort(), 15000);
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify(payload()),
+          body: JSON.stringify(payload(turnstileToken)),
           signal: ctrl.signal,
         });
         if (res.status === 202 || res.status === 200) {
           const data = await res.json().catch(() => ({}));
-          form.reset(); count.textContent = '0'; submissionId = crypto.randomUUID();
-          setStatus('ok', `Message sent${data?.id ? ` (reference ${data.id})` : ''}.`);
+          form.reset(); count.textContent = '0'; submissionId = uuid();
+          setStatus('ok', `Message sent${data?.id ? ` (reference ${data.id})` : ''}. A reply will come to your email address.`);
         } else if (res.status === 400) {
           const data = await res.json().catch(() => ({}));
           const errs = (data && data.errors) || {};
           if (Object.keys(errs).length) showErrors(errs);
           setStatus('err', 'Some details need correcting. Check the highlighted fields.');
+        } else if (res.status === 403) {
+          failWithFallback('We could not confirm that this message was sent by a person. Please try again in a moment.');
         } else if (res.status === 429) {
-          fallbackLink.href = mailtoHref();
-          setFallback('Send it by email instead', false);
-          setStatus('err', 'Too many messages were sent recently. Please try again in a few minutes.', true);
+          failWithFallback('Too many messages were sent recently. Please try again in a few minutes.');
         } else {
-          fallbackLink.href = mailtoHref();
-          setFallback('Send it by email instead', false);
-          setStatus('err', res.status >= 500
+          failWithFallback(res.status >= 500
             ? 'The message could not be sent because the mail service is unavailable. Please try again shortly.'
-            : `The message could not be sent (server responded ${res.status}).`, true);
+            : `The message could not be sent (server responded ${res.status}).`);
         }
       } catch (e) {
-        fallbackLink.href = mailtoHref();
-        setFallback('Send it by email instead', false);
-        setStatus('err', (e as Error).name === 'AbortError' ? 'The request timed out. Check your connection and try again.' : 'The message could not be sent. Check your connection and try again.', true);
+        failWithFallback((e as Error).name === 'AbortError' ? 'The request timed out. Check your connection and try again.' : 'The message could not be sent. Check your connection and try again.');
       } finally {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
+        resetToken();
         inFlight = false;
         setBusy(false);
       }

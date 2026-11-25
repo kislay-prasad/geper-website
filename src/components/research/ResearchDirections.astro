@@ -158,8 +158,8 @@ const evidence = [
               <span class="rd-mark" aria-hidden="true"></span>
               <div class="flex items-start justify-between gap-4">
                 <h3 class="flex flex-col gap-2">
-                  <span class="label text-ink-muted">{p.index}</span>
-                  <button type="button" class="rd-btn text-left text-h3 text-ink transition-colors" aria-expanded={i === 0 ? 'true' : 'false'} aria-controls={`rd-detail-${i}`}>
+                  <span class="label text-ink-muted" aria-hidden="true">{p.index}</span>
+                  <button type="button" class="rd-btn text-left text-h3 text-ink transition-colors" aria-pressed={i === 0 ? 'true' : 'false'}>
                     {p.title}
                   </button>
                 </h3>
@@ -168,13 +168,11 @@ const evidence = [
 
               <p class="rd-brief mt-3 max-w-prose text-body text-ink-2">{p.brief}</p>
 
-              <div id={`rd-detail-${i}`} class="rd-detail">
-                <div class="min-h-0 overflow-hidden">
-                  <ul class="mt-4 flex flex-col gap-1.5 border-l border-accent/40 pl-4">
-                    {p.directions.map((d) => <li class="text-body-sm text-ink-muted">{d}</li>)}
-                  </ul>
-                </div>
-              </div>
+              {/* Always shown: expanding the active row on scroll moved everything below it
+                  (layout shift). The active row is marked by the rule, the title colour and the diagram. */}
+              <ul class="mt-4 flex flex-col gap-1.5 border-l border-accent/40 pl-4">
+                {p.directions.map((d) => <li class="text-body-sm text-ink-muted">{d}</li>)}
+              </ul>
             </div>
           </li>
         ))}
@@ -205,7 +203,7 @@ const evidence = [
       root.dataset.active = String(i);
       rows.forEach((r, n) => {
         r.dataset.active = String(n === i);
-        r.querySelector('.rd-btn')?.setAttribute('aria-expanded', String(n === i));
+        r.querySelector('.rd-btn')?.setAttribute('aria-pressed', String(n === i));
       });
       figs.forEach((f, n) => f.classList.toggle('is-on', n === i));
       if (caption) caption.textContent = rows[i].dataset.caption ?? '';
@@ -401,15 +399,8 @@ const evidence = [
   .rd-row[data-active='true'] .rd-btn { color: var(--color-accent-text); }
   .rd-row:not([data-active='true']) .rd-brief { color: var(--color-ink-muted); }
 
-  .rd-detail {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 460ms var(--ease-out-quart);
-  }
-  .rd-row[data-active='true'] .rd-detail { grid-template-rows: 1fr; }
-
   @media (prefers-reduced-motion: reduce) {
-    .rd-fig, .rd-mark, .rd-detail, .rd-ebar, .rd-sbar, .rd-tick--drop, .rd-encgroup { transition: none; }
+    .rd-fig, .rd-mark, .rd-ebar, .rd-sbar, .rd-tick--drop, .rd-encgroup { transition: none; }
     .rd-ebar, .rd-sbar, .rd-tick--drop { transform: none; }
     .rd-sbar { opacity: 0.8; }
     .rd-fig :global(*) { animation: none !important; }

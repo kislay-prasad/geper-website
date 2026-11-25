@@ -216,7 +216,7 @@ export const platform = {
     what: 'It places each variant in biological and population context, gathers computational and curated evidence, and shows the reasoning behind every interpretation. The final judgement stays with qualified experts.',
     who: ['Clinical genomics and diagnostic laboratories', 'Academic and translational research groups', 'Biotech and pharmaceutical R&D teams'],
     statusFlags: ['In development', 'Not publicly available', 'Not clinically validated'],
-    availabilityNote: 'Bij AI is currently in development and will be available to the world soon.',
+    availabilityNote: 'Bij AI is in development and is not yet publicly available. To follow its progress, get in touch.',
   },
 } as const;
 

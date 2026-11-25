@@ -13,8 +13,8 @@ import Section from '@/components/sections/Section.astro';
 import Eyebrow from '@/components/ui/Eyebrow.astro';
 import { site } from '@/data/site';
 
-const updated = site.legalUpdated
-  ? new Date(site.legalUpdated).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+const updated = site.termsUpdated
+  ? new Date(site.termsUpdated).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   : '';
 
 const clauses = [
@@ -76,7 +76,7 @@ const clauses = [
     <div class="tm-col tm-doc mt-10 border-t border-line pt-8 md:mt-12">
       {updated && (
         <p class="label text-ink-muted">
-          Last updated <time datetime={site.legalUpdated}>{updated}</time>
+          Last updated <time datetime={site.termsUpdated}>{updated}</time>
         </p>
       )}
 

@@ -55,7 +55,7 @@ const steps = home.narrative;
                 <p id="dna-stage-label" class="mt-1 font-mono text-meta text-accent-text" aria-live="polite">01 · Biological data</p>
               </div>
               <ol class="flex gap-1.5" aria-hidden="true">
-                {backbone.map((s, i) => <li class="h-1 w-6 rounded-full bg-line-strong data-[on=true]:bg-accent" data-idx={i} data-on={i === 0 ? 'true' : 'false'}></li>)}
+                {backbone.map((_, i) => <li class="h-1 w-6 rounded-full bg-line-strong data-[on=true]:bg-accent" data-idx={i} data-on={i === 0 ? 'true' : 'false'}></li>)}
               </ol>
             </div>
           </div>
@@ -227,12 +227,19 @@ const steps = home.narrative;
     #dna-stage { max-height: 40vh; max-height: 40svh; }
   }
 
-  .dna-step { transition: opacity 200ms; }
+  /* Desktop: the active step leads and the others recede. They recede by colour rather than
+     opacity, so their text keeps AA contrast (ink-muted is at least 4.5:1 on this ground). */
+  .dna-step h3,
+  .dna-step p,
+  .dna-step p span { transition: color 200ms; }
   @media (min-width: 1024px) {
-    .dna-step { opacity: 0.45; }
-    .dna-step.is-active { opacity: 1; }
+    .dna-step:not(.is-active) h3,
+    .dna-step:not(.is-active) p,
+    .dna-step:not(.is-active) p span { color: var(--color-ink-muted); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .dna-step { transition: none; }
+    .dna-step h3,
+    .dna-step p,
+    .dna-step p span { transition: none; }
   }
 </style>
