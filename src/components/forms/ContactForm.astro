@@ -71,10 +71,11 @@ const formAttrs = mode === 'endpoint'
     <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
   </div>
 
-  <!-- Turnstile: stays invisible unless Cloudflare needs the visitor to click once. -->
-  {turnstileKey && <div data-turnstile-box class="flex justify-end empty:hidden"></div>}
-
+  <!-- Turnstile stays invisible unless Cloudflare needs the visitor to click once. On wider screens
+       its 300×73 slot beside the button is reserved and kept hidden until then, so the widget
+       appearing never moves anything (no layout shift). On phones it sits below the button. -->
   <div class="flex flex-col gap-4 border-t border-line-faint pt-6 md:flex-row md:items-center md:justify-end">
+    {turnstileKey && <div data-turnstile-box class="invisible order-last md:order-none md:mr-auto md:h-[73px] md:w-[300px]"></div>}
     <Button type="submit" icon="arrow-right" id="contact-submit">{mode === 'mailto' ? 'Open in email' : 'Send Message'}</Button>
   </div>
 
@@ -230,6 +231,8 @@ const formAttrs = mode === 'endpoint'
         appearance: 'interaction-only',
         theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
         'response-field': false,
+        // The slot stays hidden until Cloudflare actually needs the visitor to interact.
+        'before-interactive-callback': () => tsBox.classList.remove('invisible'),
         callback: gotToken,
         'expired-callback': () => { token = ''; },
         'error-callback': () => { token = ''; },
