@@ -43,14 +43,18 @@ endpointOrigins.delete(null);
 
 /* Turnstile loads its script from, and renders its iframe on, this origin (contact page). */
 const TURNSTILE = 'https://challenges.cloudflare.com';
+/* Cloudflare Web Analytics (automatic setup) injects its beacon at the edge, so it never appears
+   in the built HTML: its script and reporting origins have to be listed explicitly. */
+const CF_ANALYTICS_SCRIPT = 'https://static.cloudflareinsights.com';
+const CF_ANALYTICS_REPORT = 'https://cloudflareinsights.com';
 
 const csp = [
   "default-src 'self'",
-  ['script-src', "'self'", ...[...hashes].sort(), TURNSTILE, ...scriptOrigins].join(' '),
+  ['script-src', "'self'", ...[...hashes].sort(), TURNSTILE, CF_ANALYTICS_SCRIPT, ...scriptOrigins].join(' '),
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:", // small font subsets are inlined into the CSS as data: URLs by the build
-  ['connect-src', "'self'", ...endpointOrigins, ...scriptOrigins].join(' '),
+  ['connect-src', "'self'", CF_ANALYTICS_REPORT, ...endpointOrigins, ...scriptOrigins].join(' '),
   `frame-src ${TURNSTILE}`,
   "object-src 'none'",
   "base-uri 'self'",
