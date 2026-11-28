@@ -12,7 +12,7 @@
  *
  * Environment (Worker → Settings → Variables and Secrets; locally .dev.vars):
  *   RESEND_API_KEY       (secret, required)
- *   TURNSTILE_SECRET_KEY (secret, recommended; when set, every submission needs a valid token)
+ *   TURNSTILE_SECRET_KEY (secret, required; without it every submission is refused — verification never fails open)
  *   CONTACT_TO           (optional, default contact@geper.in)
  *   CONTACT_FROM         (optional, default "GEPER Website <onboarding@resend.dev>";
  *                         configure a verified notify.geper.in sender for production)
@@ -85,14 +85,24 @@ function limited(ip: string, now: number) {
 
 type Verification = 'ok' | 'failed' | 'unavailable';
 
-/** Turnstile server-side check. Without a configured secret the check is skipped (local dev). */
-async function verifyTurnstile(env: Env, token: string, ip: string, fetchImpl: typeof fetch): Promise<Verification> {
-  if (!env.TURNSTILE_SECRET_KEY) return 'ok';
+/**
+ * Turnstile server-side check. It only ever answers 'ok' when Cloudflare itself confirms the token:
+ * a missing secret or token, an unreachable or erroring siteverify, an unparseable reply, `success`
+ * not true, or the wrong action or hostname are all refusals. Nothing here skips the check.
+ */
+async function verifyTurnstile(
+  secret: string,
+  token: string,
+  ip: string,
+  allowedHostnames: Set<string>,
+  verifyUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<Verification> {
   if (!token) return 'failed';
-  const body = new URLSearchParams({ secret: env.TURNSTILE_SECRET_KEY, response: token });
+  const body = new URLSearchParams({ secret, response: token });
   if (ip && ip !== 'unknown') body.set('remoteip', ip);
   try {
-    const res = await fetchImpl(env.TURNSTILE_VERIFY_URL || SITEVERIFY_URL, {
+    const res = await fetchImpl(verifyUrl, {
       method: 'POST',
       body,
       signal: AbortSignal.timeout(8_000),
@@ -101,12 +111,19 @@ async function verifyTurnstile(env: Env, token: string, ip: string, fetchImpl: t
       console.error('contact: Turnstile siteverify returned', res.status);
       return 'unavailable';
     }
-    const data = (await res.json().catch(() => null)) as { success?: boolean; action?: string; 'error-codes'?: string[] } | null;
-    if (!data?.success) {
+    const data = (await res.json().catch(() => null)) as { success?: boolean; action?: string; hostname?: string; 'error-codes'?: string[] } | null;
+    if (data?.success !== true) {
       console.warn('contact: Turnstile rejected the token', (data?.['error-codes'] ?? []).join(','));
       return 'failed';
     }
-    if (data.action && data.action !== 'contact') return 'failed';
+    if (data.action !== 'contact') {
+      console.warn('contact: Turnstile action mismatch');
+      return 'failed';
+    }
+    if (typeof data.hostname !== 'string' || !allowedHostnames.has(data.hostname.toLowerCase())) {
+      console.warn('contact: Turnstile hostname mismatch');
+      return 'failed';
+    }
     return 'ok';
   } catch (e) {
     console.error('contact: Turnstile siteverify failed', (e as Error).name);
@@ -278,7 +295,19 @@ export async function handleContact(
     return respond(fail(503, 'not_configured'));
   }
 
-  const verification = await verifyTurnstile(env, token, ip, fetchImpl);
+  // Fail closed: with no Turnstile secret the form cannot be verified, so it accepts nothing.
+  const turnstileSecret = (env.TURNSTILE_SECRET_KEY ?? '').trim();
+  if (!turnstileSecret) {
+    console.error('contact: TURNSTILE_SECRET_KEY is not configured');
+    return respond(fail(503, 'not_configured'));
+  }
+
+  // The widget must have been solved on this site: the request's own host, plus any configured origins.
+  const allowedHostnames = new Set<string>([new URL(request.url).hostname.toLowerCase()]);
+  for (const o of (env.ALLOWED_ORIGINS ?? '').split(',').map((v) => v.trim()).filter(Boolean)) {
+    try { allowedHostnames.add(new URL(o).hostname.toLowerCase()); } catch { /* ignore a malformed entry */ }
+  }
+  const verification = await verifyTurnstile(turnstileSecret, token, ip, allowedHostnames, env.TURNSTILE_VERIFY_URL || SITEVERIFY_URL, fetchImpl);
   if (verification === 'failed') return respond(fail(403, 'verification_failed'));
   if (verification === 'unavailable') return respond(fail(503, 'verification_unavailable'));
 

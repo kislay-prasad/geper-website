@@ -20,6 +20,7 @@ const VALID = {
   message: 'We would like to discuss a research collaboration on variant interpretation.',
   website: '',
   submissionId: 'test-submission-0001',
+  turnstileToken: 'tok-valid',
 };
 
 type Call = { url: string; init: RequestInit };
@@ -32,7 +33,7 @@ function stub(opts: { resend?: () => Response; siteverify?: () => Response; thro
     calls.push({ url, init });
     if (url.includes('siteverify')) {
       if (opts.throwOn === 'siteverify') throw new TypeError('network down');
-      return opts.siteverify?.() ?? Response.json({ success: true, action: 'contact' });
+      return opts.siteverify?.() ?? Response.json({ success: true, action: 'contact', hostname: 'geper.in' });
     }
     if (opts.throwOn === 'resend') throw new TypeError('network down');
     return opts.resend?.() ?? Response.json({ id: 'email-123' });
@@ -40,7 +41,7 @@ function stub(opts: { resend?: () => Response; siteverify?: () => Response; thro
   return { impl, calls, resendCalls: () => calls.filter((c) => c.url.includes('resend')), verifyCalls: () => calls.filter((c) => c.url.includes('siteverify')) };
 }
 
-const env = (extra: Partial<Env> = {}): Env => ({ RESEND_API_KEY: 're_test', CONTACT_FROM: 'GEPER Website <website@notify.geper.in>', ...extra });
+const env = (extra: Partial<Env> = {}): Env => ({ RESEND_API_KEY: 're_test', TURNSTILE_SECRET_KEY: 'ts-secret', CONTACT_FROM: 'GEPER Website <website@notify.geper.in>', ...extra });
 
 function jsonRequest(body: unknown, headers: Record<string, string> = {}) {
   const text = JSON.stringify(body);
@@ -174,43 +175,124 @@ test('Resend rejection is 502, Resend rate limit is 503, network failure is 502'
   assert.deepEqual(await down.json(), { error: 'provider_unreachable' });
 });
 
-/* ---------------------------------------------------------------- Turnstile */
+/* ---------------------------------------------------------------- Turnstile
+   Verification fails closed: every path that is not a clear "Cloudflare confirmed this token"
+   refuses the message, and nothing is emailed. */
 
 const TS = { TURNSTILE_SECRET_KEY: 'ts-secret' };
+const GOOD = { success: true, action: 'contact', hostname: 'geper.in' };
+const verifyWith = (body: unknown, status = 200) => () => Response.json(body as object, { status });
 
-test('Turnstile: no token → 403 and nothing is emailed', async () => {
-  const s = stub();
-  const res = await handleContact(jsonRequest(VALID), env(TS), s.impl);
-  assert.equal(res.status, 403);
-  assert.deepEqual(await res.json(), { error: 'verification_failed' });
-  assert.equal(s.resendCalls().length, 0);
-});
+async function expectRefused(res: Response, status: number, code: string, s: ReturnType<typeof stub>) {
+  assert.equal(res.status, status);
+  assert.deepEqual(await res.json(), { error: code });
+  assert.equal(s.resendCalls().length, 0, 'nothing may be emailed');
+}
 
 test('Turnstile: valid token is verified server-side, then the message is sent', async () => {
   const s = stub();
   const res = await handleContact(jsonRequest({ ...VALID, turnstileToken: 'tok-1' }), env(TS), s.impl);
   assert.equal(res.status, 202);
-  const verify = s.verifyCalls()[0];
-  const form = new URLSearchParams(String(verify.init.body));
+  const form = new URLSearchParams(String(s.verifyCalls()[0].init.body));
   assert.equal(form.get('secret'), 'ts-secret');
   assert.equal(form.get('response'), 'tok-1');
   assert.ok(form.get('remoteip'));
   assert.equal(s.resendCalls().length, 1);
 });
 
-test('Turnstile: rejected token or wrong action → 403', async () => {
-  const rejected = await handleContact(jsonRequest({ ...VALID, turnstileToken: 't' }), env(TS), stub({ siteverify: () => Response.json({ success: false, 'error-codes': ['invalid-input-response'] }) }).impl);
-  assert.equal(rejected.status, 403);
-  const wrongAction = await handleContact(jsonRequest({ ...VALID, turnstileToken: 't' }), env(TS), stub({ siteverify: () => Response.json({ success: true, action: 'login' }) }).impl);
-  assert.equal(wrongAction.status, 403);
+test('Turnstile: secret missing → 503 not_configured, siteverify never called, nothing emailed', async () => {
+  for (const TURNSTILE_SECRET_KEY of [undefined, '', '   ']) {
+    const s = stub();
+    const res = await handleContact(jsonRequest(VALID), env({ TURNSTILE_SECRET_KEY }), s.impl);
+    await expectRefused(res, 503, 'not_configured', s);
+    assert.equal(s.verifyCalls().length, 0);
+  }
+});
+
+test('Turnstile: secret missing is also refused for a native form post', async () => {
+  const s = stub();
+  const res = await handleContact(formRequest(VALID), env({ TURNSTILE_SECRET_KEY: '' }), s.impl);
+  assert.equal(res.status, 503);
+  assert.equal(s.resendCalls().length, 0);
+});
+
+test('Turnstile: no token → 403 and nothing is emailed', async () => {
+  for (const turnstileToken of ['', undefined]) {
+    const s = stub();
+    const res = await handleContact(jsonRequest({ ...VALID, turnstileToken }), env(TS), s.impl);
+    await expectRefused(res, 403, 'verification_failed', s);
+    assert.equal(s.verifyCalls().length, 0, 'no token means Cloudflare is not even asked');
+  }
+});
+
+test('Turnstile: invalid, expired or reused token (success:false) → 403', async () => {
+  for (const code of ['invalid-input-response', 'timeout-or-duplicate']) {
+    const s = stub({ siteverify: verifyWith({ success: false, 'error-codes': [code] }) });
+    await expectRefused(await handleContact(jsonRequest(VALID), env(TS), s.impl), 403, 'verification_failed', s);
+  }
+});
+
+test('Turnstile: only an explicit success:true passes (truthy look-alikes and junk are refused)', async () => {
+  for (const reply of [{ ...GOOD, success: 'true' }, { ...GOOD, success: 1 }, {}, [], null, 'ok']) {
+    const s = stub({ siteverify: verifyWith(reply) });
+    await expectRefused(await handleContact(jsonRequest(VALID), env(TS), s.impl), 403, 'verification_failed', s);
+  }
+});
+
+test('Turnstile: wrong or missing action → 403', async () => {
+  for (const action of ['login', '', undefined]) {
+    const s = stub({ siteverify: verifyWith({ ...GOOD, action }) });
+    await expectRefused(await handleContact(jsonRequest(VALID), env(TS), s.impl), 403, 'verification_failed', s);
+  }
+});
+
+test('Turnstile: wrong or missing hostname → 403', async () => {
+  for (const hostname of ['evil.example', 'geper.in.evil.example', 'notgeper.in', '', undefined]) {
+    const s = stub({ siteverify: verifyWith({ ...GOOD, hostname }) });
+    await expectRefused(await handleContact(jsonRequest(VALID), env(TS), s.impl), 403, 'verification_failed', s);
+  }
+});
+
+test('Turnstile: hostname is matched case-insensitively and ALLOWED_ORIGINS hosts are accepted', async () => {
+  const upper = stub({ siteverify: verifyWith({ ...GOOD, hostname: 'GEPER.IN' }) });
+  assert.equal((await handleContact(jsonRequest(VALID), env(TS), upper.impl)).status, 202);
+  const extra = stub({ siteverify: verifyWith({ ...GOOD, hostname: 'www.geper.in' }) });
+  const res = await handleContact(jsonRequest(VALID, { Origin: 'https://www.geper.in' }), env({ ...TS, ALLOWED_ORIGINS: 'https://www.geper.in' }), extra.impl);
+  assert.equal(res.status, 202);
 });
 
 test('Turnstile: siteverify unreachable → 503, nothing emailed', async () => {
   const s = stub({ throwOn: 'siteverify' });
-  const res = await handleContact(jsonRequest({ ...VALID, turnstileToken: 't' }), env(TS), s.impl);
-  assert.equal(res.status, 503);
-  assert.deepEqual(await res.json(), { error: 'verification_unavailable' });
-  assert.equal(s.resendCalls().length, 0);
+  await expectRefused(await handleContact(jsonRequest(VALID), env(TS), s.impl), 503, 'verification_unavailable', s);
+});
+
+test('Turnstile: siteverify answers with an HTTP error or unparseable body → refused, nothing emailed', async () => {
+  for (const status of [500, 502, 429]) {
+    const s = stub({ siteverify: verifyWith(GOOD, status) });
+    await expectRefused(await handleContact(jsonRequest(VALID), env(TS), s.impl), 503, 'verification_unavailable', s);
+  }
+  const garbage = stub({ siteverify: () => new Response('<html>oops</html>', { status: 200 }) });
+  await expectRefused(await handleContact(jsonRequest(VALID), env(TS), garbage.impl), 403, 'verification_failed', garbage);
+});
+
+test('Turnstile: refusals never echo the secret, the token or internals', async () => {
+  const cases = [
+    await handleContact(jsonRequest({ ...VALID, turnstileToken: 'tok-SENSITIVE' }), env(TS), stub({ siteverify: verifyWith({ success: false, 'error-codes': ['invalid-input-secret'] }) }).impl),
+    await handleContact(jsonRequest(VALID), env(TS), stub({ throwOn: 'siteverify' }).impl),
+    await handleContact(jsonRequest(VALID), env({ TURNSTILE_SECRET_KEY: '' }), stub().impl),
+  ];
+  for (const res of cases) {
+    const text = await res.text();
+    assert.match(text, /^\{"error":"[a-z_]+"\}$/);
+    assert.ok(!/ts-secret|tok-SENSITIVE|re_test|invalid-input-secret/.test(text));
+  }
+});
+
+test('Turnstile: validation errors still come first, and the message is never sent on a refusal', async () => {
+  const s = stub({ siteverify: verifyWith({ success: false }) });
+  const bad = await handleContact(jsonRequest({ ...VALID, email: 'not-an-email' }), env(TS), s.impl);
+  assert.equal(bad.status, 400);
+  assert.equal(s.verifyCalls().length, 0);
 });
 
 /* ------------------------------------------- native form posts (no JavaScript) */
@@ -233,7 +315,7 @@ test('form post: validation errors come back as an HTML page listing them', asyn
 });
 
 test('form post without a Turnstile token explains how to email instead', async () => {
-  const res = await handleContact(formRequest(VALID), env(TS), stub().impl);
+  const res = await handleContact(formRequest({ ...VALID, turnstileToken: '' }), env(TS), stub().impl);
   assert.equal(res.status, 403);
   const html = await res.text();
   assert.match(html, /mailto:contact@geper\.in/);
