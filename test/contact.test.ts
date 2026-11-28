@@ -295,6 +295,78 @@ test('Turnstile: validation errors still come first, and the message is never se
   assert.equal(s.verifyCalls().length, 0);
 });
 
+/* ------------------------------------------------------- input hardening */
+
+test('subject and body: bidi overrides, zero-width and separator characters are stripped; joiners are kept', async () => {
+  const s = stub();
+  const name = 'Ada\u202e Lovelace\u200b\u2066x\u2069\ufeff';
+  const res = await handleContact(jsonRequest({ ...VALID, name, message: VALID.message + '\u202e hidden \u200f' }), env(), s.impl);
+  assert.equal(res.status, 202);
+  const sent = JSON.parse(String(s.resendCalls()[0].init.body));
+  assert.equal(sent.subject, '[GEPER website] Research collaboration — Ada Lovelacex');
+  assert.ok(!/[\u202a-\u202e\u2066-\u2069\u200b\u200e\u200f\ufeff\u2028\u2029]/.test(sent.subject + sent.text + sent.html));
+  const indic = await handleContact(jsonRequest({ ...VALID, name: 'क\u200dष' }), env(), stub().impl);
+  assert.equal(indic.status, 202);
+});
+
+test('types: numbers, arrays and objects are treated as missing, never coerced into text', async () => {
+  for (const bad of [123, ['Ada'], { toString: 'x' }, true]) {
+    const s = stub();
+    const res = await handleContact(jsonRequest({ ...VALID, name: bad }), env(), s.impl);
+    assert.equal(res.status, 400);
+    assert.ok((await res.json()).errors.name);
+    assert.equal(s.calls.length, 0);
+  }
+  const s = stub();
+  const res = await handleContact(jsonRequest({ ...VALID, message: ['x'.repeat(40)] }), env(), s.impl);
+  assert.equal(res.status, 400);
+  assert.equal(s.calls.length, 0);
+});
+
+test('types: a non-string honeypot value is treated as a bot (nothing sent)', async () => {
+  const s = stub();
+  const res = await handleContact(jsonRequest({ ...VALID, website: ['x'] }), env(), s.impl);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true });
+  assert.equal(s.calls.length, 0);
+});
+
+test('size: an oversized body is refused with 413 even when Content-Length is missing or lies', async () => {
+  const big = JSON.stringify({ ...VALID, message: 'x'.repeat(30_000) });
+  const noLength = new Request(`${ORIGIN}/api/contact`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: ORIGIN, 'CF-Connecting-IP': nextIp() }, body: big });
+  const s1 = stub();
+  assert.equal((await handleContact(noLength, env(), s1.impl)).status, 413);
+  const lying = new Request(`${ORIGIN}/api/contact`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: ORIGIN, 'CF-Connecting-IP': nextIp(), 'Content-Length': '100' }, body: big });
+  assert.equal((await handleContact(lying, env(), stub().impl)).status, 413);
+  assert.equal(s1.calls.length, 0);
+});
+
+test('size: a chunked upload is cut off as soon as it passes the limit, not read to the end', async () => {
+  let pulled = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulled += 1;
+      if (pulled > 1000) { controller.close(); return; }
+      controller.enqueue(new TextEncoder().encode('x'.repeat(1_000)));
+    },
+  });
+  const req = new Request(`${ORIGIN}/api/contact`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: ORIGIN, 'CF-Connecting-IP': nextIp() },
+    body: stream,
+    duplex: 'half',
+  } as RequestInit);
+  const s = stub();
+  assert.equal((await handleContact(req, env(), s.impl)).status, 413);
+  assert.ok(pulled < 100, `body was read far past the 20 000 byte limit (${pulled} chunks)`);
+  assert.equal(s.calls.length, 0);
+});
+
+test('size: a body just under the limit is still accepted', async () => {
+  const res = await handleContact(jsonRequest({ ...VALID, message: 'y'.repeat(3_900) }), env(), stub().impl);
+  assert.equal(res.status, 202);
+});
+
 /* ------------------------------------------- native form posts (no JavaScript) */
 
 test('form post: success redirects (303) to /message-sent — nothing in the URL', async () => {

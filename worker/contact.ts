@@ -59,12 +59,43 @@ export const json = (body: unknown, status = 200, extra: Record<string, string> 
   });
 
 /** Single-line text: drop control characters (blocks header injection), collapse whitespace. */
+/** Only real strings are accepted: numbers, arrays and objects are treated as missing, never coerced. */
+const asString = (v: unknown) => (typeof v === 'string' ? v : '');
+
+/** Invisible and direction-changing characters that can make an inbox subject or name look like something else
+    (bidi overrides and isolates, marks, zero-width space, BOM, line/paragraph separators). Joiners (U+200C/U+200D)
+    are kept: names and words in Indic and Persian scripts need them. */
+const SPOOFING = /[\u061c\u200b\u200e\u200f\u202a-\u202e\u2060\u2066-\u2069\u2028\u2029\ufeff]/g;
+
 const oneLine = (v: unknown, max: number) =>
-  String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  asString(v).replace(SPOOFING, '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 
 /** Multi-line text: keep newlines/tabs, drop other control characters, normalise line endings. */
 const multiLine = (v: unknown, max: number) =>
-  String(v ?? '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, max);
+  asString(v).replace(SPOOFING, '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, max);
+
+/** Reads the request body but stops (and returns null) as soon as it passes `max` bytes, so a chunked or
+    lying Content-Length upload is never buffered whole. */
+async function readCapped(request: Request, max: number): Promise<string | null> {
+  if (!request.body) return '';
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) { all.set(c, at); at += c.byteLength; }
+  return new TextDecoder().decode(all);
+}
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -255,12 +286,12 @@ export async function handleContact(
 
   let raw: Record<string, unknown>;
   try {
-    const text = await request.text();
-    if (text.length > MAX_BODY) return respond(fail(413, 'too_large'));
+    const bodyText = await readCapped(request, MAX_BODY);
+    if (bodyText === null) return respond(fail(413, 'too_large'));
     if (isForm) {
-      raw = Object.fromEntries(new URLSearchParams(text));
+      raw = Object.fromEntries(new URLSearchParams(bodyText));
     } else {
-      raw = JSON.parse(text);
+      raw = JSON.parse(bodyText);
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('shape');
     }
   } catch {
@@ -268,7 +299,7 @@ export async function handleContact(
   }
 
   // Spam trap: real visitors never see this field. Pretend success, send nothing.
-  if (String(raw.website ?? '').trim() !== '') return respond({ kind: 'decoy' });
+  if (raw.website !== undefined && raw.website !== null && (typeof raw.website !== 'string' || raw.website.trim() !== '')) return respond({ kind: 'decoy' });
 
   const name = oneLine(raw.name, 120);
   const email = oneLine(raw.email, 200);
