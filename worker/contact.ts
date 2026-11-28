@@ -38,7 +38,7 @@ const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverif
 const SENT_PAGE = '/message-sent';
 const CATEGORIES: Record<string, string> = {
   research: 'Research collaboration',
-  platform: 'Platform / Bij AI discussion',
+  platform: 'Platform / BIJ AI discussion',
   data: 'Data partnership',
   press: 'Press and media',
   general: 'General enquiry',
