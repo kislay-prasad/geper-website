@@ -29,7 +29,7 @@
     "@types/node": "^26.4.0",
     "@types/three": "^0.187.0",
     "tailwindcss": "^4.3.3",
-    "typescript": "^7.0.2",
+    "typescript": "^6.0.3",
     "wrangler": "^4.160.0"
   },
   "engines": {

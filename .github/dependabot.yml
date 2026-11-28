@@ -11,6 +11,11 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # @astrojs/check (used by `npm run check`) only supports TypeScript 5 and 6, so a TypeScript 7 bump
+      # fails `npm ci`. Remove this once @astrojs/check declares TypeScript 7 support.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:
