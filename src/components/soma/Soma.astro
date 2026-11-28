@@ -1,0 +1,210 @@
+---
+/**
+ * SOMA by GEPER — launcher.
+ *
+ * This is the only part of SOMA that ships with a page: one button and a few lines of script. The
+ * notebook itself (panel code, FAQ data, stylesheet) is a separate chunk that is fetched the first
+ * time the button is used — or a moment earlier, when a pointer or keyboard focus reaches it — so
+ * SOMA adds no meaningful weight to the first load and nothing to the critical path.
+ *
+ * Staying out of the way:
+ *   - the button sits above the footer rather than over its links (it lifts as the footer scrolls in);
+ *   - on the contact page it tucks itself away while it would cover the "Send Message" button or a
+ *     visible verification box, and returns as soon as they scroll clear;
+ *   - it is hidden while the notebook is open, and in print.
+ */
+import { somaMarkImg } from './soma-mark.ts';
+---
+<div class="soma-launch" data-soma>
+  <button
+    type="button"
+    class="soma-launcher"
+    data-soma-launcher
+    aria-haspopup="dialog"
+    aria-expanded="false"
+    hidden
+  >
+    <span class="soma-launcher__mark" set:html={somaMarkImg(34)} aria-hidden="true"></span>
+    <span class="soma-launcher__label" aria-hidden="true">SOMA</span>
+    <span class="soma-launcher__sr">SOMA, GEPER’s FAQ notebook. Open</span>
+  </button>
+  <p class="soma-launcher__sr" role="status" data-soma-status></p>
+</div>
+
+<script>
+  const wrap = document.querySelector<HTMLElement>('[data-soma]');
+  const launcher = wrap?.querySelector<HTMLButtonElement>('[data-soma-launcher]');
+  const status = wrap?.querySelector<HTMLElement>('[data-soma-status]');
+
+  if (launcher) {
+    // Without scripting the button would do nothing, so it only appears once scripting is running.
+    launcher.hidden = false;
+
+    type Panel = typeof import('./soma-panel.ts');
+    let loading: Promise<Panel> | null = null;
+    const load = () => (loading ??= import('./soma-panel.ts'));
+
+    // Fetch ahead of the click (the notebook code, and the opening video), but only on intent — never on page load.
+    for (const type of ['pointerenter', 'focus', 'touchstart'] as const) {
+      launcher.addEventListener(type, () => void load().then((panel) => panel.warmSoma(launcher)).catch(() => (loading = null)), { once: true, passive: true });
+    }
+
+    launcher.addEventListener('click', async () => {
+      launcher.setAttribute('aria-busy', 'true');
+      try {
+        const panel = await load();
+        panel.openSoma(launcher);
+        if (status) status.textContent = '';
+      } catch {
+        loading = null; // allow a retry
+        if (status) status.textContent = 'SOMA could not load. Please try again.';
+      } finally {
+        launcher.removeAttribute('aria-busy');
+      }
+    });
+
+    /* ------------------------------------------------ keeping clear of the page */
+
+    const footer = document.querySelector<HTMLElement>('body > footer');
+    const GAP = 4;
+    // The contact page keeps the button to a small circle, so it overlaps the form far less often.
+    launcher.toggleAttribute('data-compact', !!document.querySelector('#contact-submit'));
+    let queued = false;
+
+    const place = () => {
+      queued = false;
+      // Lift above the footer as it scrolls into view, so its links are never covered.
+      let lift = 0;
+      if (footer) {
+        const top = footer.getBoundingClientRect().top;
+        if (top < window.innerHeight) lift = Math.round(window.innerHeight - top);
+      }
+      launcher.style.setProperty('--soma-lift', `${lift}px`);
+
+      // Tuck away while over the contact form's send button or a visible verification box.
+      const mine = launcher.getBoundingClientRect();
+      const avoid = document.querySelectorAll<HTMLElement>('#contact-submit, [data-turnstile-box]:not(.invisible)');
+      let covering = false;
+      for (const target of avoid) {
+        const r = target.getBoundingClientRect();
+        if (!r.width || !r.height) continue;
+        if (r.left < mine.right + GAP && r.right > mine.left - GAP && r.top < mine.bottom + GAP && r.bottom > mine.top - GAP) {
+          covering = true;
+          break;
+        }
+      }
+      launcher.toggleAttribute('data-tucked', covering);
+    };
+    const queue = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(place);
+    };
+
+    window.addEventListener('scroll', queue, { passive: true });
+    window.addEventListener('resize', queue, { passive: true });
+    // Forms grow and shrink (error messages, the verification box), which moves things without a scroll.
+    if ('ResizeObserver' in window) new ResizeObserver(queue).observe(document.body);
+    place();
+  }
+</script>
+
+<style>
+  .soma-launcher[hidden] { display: none; }
+
+  .soma-launcher {
+    position: fixed;
+    z-index: 45; /* under the site header (50) and its mobile menu, over page content */
+    right: max(1.25rem, env(safe-area-inset-right));
+    bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + var(--soma-lift, 0px));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 9999px;
+    /* The approved artwork is light on black, so the button is a dark chip with the artwork's own
+       blue glow around it. */
+    background: #03050a;
+    color: #cfe4ff;
+    box-shadow:
+      0 0 0 1px rgb(64 150 255 / 0.55),
+      0 0 18px rgb(40 120 255 / 0.4),
+      0 8px 22px rgb(0 0 0 / 0.38);
+    cursor: pointer;
+    transition:
+      transform 180ms var(--ease-out-quart),
+      opacity 160ms ease,
+      box-shadow 180ms ease,
+      visibility 0s linear 0s;
+  }
+  .soma-launcher:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 1px rgb(110 180 255 / 0.85),
+      0 0 26px rgb(50 140 255 / 0.62),
+      0 8px 22px rgb(0 0 0 / 0.38);
+  }
+  .soma-launcher:active { transform: scale(0.97); }
+  .soma-launcher:focus-visible {
+    outline: 2px solid var(--color-accent-text);
+    outline-offset: 4px;
+  }
+
+  .soma-launcher__mark { display: inline-flex; }
+  /* The mark is drawn on black; `screen` lets the black fall away on the dark chip. */
+  .soma-launcher__mark :global(.soma-mark-img) { display: block; mix-blend-mode: screen; pointer-events: none; }
+  .soma-launcher__label {
+    display: none;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    color: #cfe4ff;
+  }
+  @media (min-width: 768px) {
+    .soma-launcher:not([data-compact]) { width: auto; padding: 0 1.2rem 0 1.05rem; }
+    .soma-launcher:not([data-compact]) .soma-launcher__label { display: inline; }
+  }
+
+  /* A small mark while a minimised notebook is waiting with its place kept. */
+  .soma-launcher[data-notes="true"]::after {
+    content: "";
+    position: absolute;
+    top: 0.1rem;
+    right: 0.1rem;
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 9999px;
+    background: #4da3ff;
+    border: 2px solid #03050a;
+  }
+
+  /* Out of the way: the notebook is open, or the button would cover a form control. */
+  .soma-launcher[data-open="true"],
+  .soma-launcher[data-tucked] {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: scale(0.85);
+    transition-delay: 0s, 0s, 0s, 180ms;
+  }
+
+  .soma-launcher__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media print { .soma-launch { display: none; } }
+</style>

@@ -54,6 +54,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:", // small font subsets are inlined into the CSS as data: URLs by the build
+  "media-src 'self' blob:", // SOMA's opening animation is downloaded whole and played from a blob: URL
   ['connect-src', "'self'", CF_ANALYTICS_REPORT, ...endpointOrigins, ...scriptOrigins].join(' '),
   `frame-src ${TURNSTILE}`,
   "object-src 'none'",

@@ -3,11 +3,13 @@
  *   1. Temporary Stitch/prototype dependencies (CDN Tailwind, googleusercontent images, template tokens, Google icon font)
  *   2. Placeholder/broken navigation (href="#" in nav/footer, links to pages that were not built)
  *   3. Missing local assets referenced by <img>, <script>, <link>
- *   4. Unsupported claims that must never appear in production copy
+ *   4. Unsupported claims that must never appear in production copy (rules in claims.ts), in page text
+ *      and in SOMA's lazy-loaded FAQ data (with only GEPER's approved terminology set aside there)
  *   5. Canonical URLs that are not the served URL, missing social image, sitemap, robots.txt,
  *      favicon.ico, or a dist/_headers without a Content-Security-Policy
  * Run automatically by `npm run build`.
  */
+import { scanClaims, SOMA_APPROVED_TERMS } from './claims.ts';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative, extname, resolve } from 'node:path';
 
@@ -38,41 +40,7 @@ for (const f of textFiles) {
   for (const [re, label] of FORBIDDEN_SOURCES) if (re.test(s)) fail(f, `forbidden: ${label}`);
 }
 
-/* 2 ─ Claims that must not exist in production copy (HTML text only) */
-const FORBIDDEN_CLAIMS = [
-  [/\bHIPAA\b/i, 'HIPAA claim'],
-  [/\bGDPR[- ]compliant\b/i, 'GDPR compliance claim'],
-  [/\bcompliant\b/i, 'compliance claim'],
-  [/\bencrypt(ed|ion)\b/i, 'encryption claim'],
-  [/\bGraphQL\b/i, 'API claim (GraphQL)'],
-  [/\bRESTful\b/i, 'API claim (RESTful)'],
-  [/\b(LIMS|EHR)\b/, 'integration claim (LIMS/EHR)'],
-  [/\bpetabyte/i, 'scale claim'],
-  [/\bmicrosecond/i, 'latency claim'],
-  [/\bproprietary (neural|dataset|data|model|AI)/i, 'proprietary technology/data claim'],
-  [/\bprotein folding\b/i, 'protein-folding claim'],
-  [/\bclinically validated\b(?!\.| and)/i, 'clinical validation claim (allowed only in negation)'],
-  [/\bFDA[- ](approved|cleared)\b/i, 'regulatory claim'],
-  [/\bCE[- ]marked\b/i, 'regulatory claim'],
-  [/\bcertified medical device\b(?!\.)/i, 'device claim (allowed only in negation)'],
-  [/\bcoming soon\b/i, 'vague "coming soon" copy'],
-  [/\bavailable\b[^.]{0,60}\bsoon\b/i, 'vague availability-date copy ("available … soon")'],
-  [/\bSystems Operational\b/i, 'fake live status'],
-  [/\bGlobal (HQ|Headquarters)\b/i, 'fake HQ claim'],
-  [/\bwet[- ]lab\b/i, 'wet-lab claim'],
-  [/\bsynthetic biology\b/i, 'synthetic-biology claim'],
-  [/\b\d{1,3}\s?(of|\/)\s?\d{1,3}\s+(ACMG|criteria)\b/i, 'criterion count'],
-  [/\b(AlphaMissense|SpliceBERT|SpliceFormer|HyenaDNA|Enformer|Borzoi|ESM-?2|RNA-FM|MMSplice|Evo ?2)\b/, 'specific model-integration claim'],
-  [/\b(gnomAD|ClinVar|ClinGen|dbSNP|UniProt|InterPro|Orphanet|MaveDB)\b/, 'specific database-integration claim'],
-  [/\b(FreeBayes|BWA|FASTQ|BAM|CRAM|VCF)\b/, 'pipeline implementation detail'],
-  [/\b\d+(\.\d+)?\s?%/, 'percentage figure (benchmark/validation numbers are not allowed)'],
-];
-// Negation phrases that are explicitly allowed in copy.
-const ALLOWED_PHRASES = [
-  /not (been )?clinically validated/i,
-  /is not a certified medical device/i,
-  /not clinically validated/i,
-];
+/* 2 ─ Claims that must not exist in production copy (HTML text only; rules live in claims.ts) */
 const textOf = (h) => h
   .replace(/<script[\s\S]*?<\/script>/gi, ' ')
   .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -81,12 +49,40 @@ const textOf = (h) => h
   .replace(/&[a-z]+;/g, ' ')
   .replace(/\s+/g, ' ');
 for (const f of html) {
-  let text = textOf(readFileSync(f, 'utf8'));
-  for (const a of ALLOWED_PHRASES) text = text.replace(a, ' ');
-  for (const [re, label] of FORBIDDEN_CLAIMS) {
-    const m = text.match(re);
-    if (m) fail(f, `forbidden claim: ${label} — "${m[0]}"`);
+  // Pages are checked against every rule, with no approved-terminology exceptions.
+  for (const hit of scanClaims(textOf(readFileSync(f, 'utf8')))) fail(f, `forbidden claim: ${hit.label} — "${hit.match}"`);
+}
+
+/* 2b ─ SOMA's FAQ. Its text is delivered in a lazy-loaded script, so the page scan above never sees
+   it; the same rules are applied to the data it is built from, with only GEPER's approved terminology
+   set aside (SOMA_APPROVED_TERMS in claims.ts). What ships is then checked against what was checked. */
+{
+  const { somaEntries, somaTopics, somaCopy } = await import('../src/data/soma-faq.ts');
+  const visible = [];
+  for (const e of somaEntries) {
+    visible.push([`SOMA ${e.id} (question)`, e.question]);
+    visible.push([`SOMA ${e.id} (answer)`, e.answer.join(' ')]);
+    for (const l of e.links ?? []) visible.push([`SOMA ${e.id} (link)`, l.label]);
   }
+  for (const t of somaTopics) visible.push([`SOMA topic ${t.id}`, `${t.title} ${t.hint}`]);
+  for (const [k, v] of Object.entries(somaCopy)) visible.push([`SOMA copy.${k}`, typeof v === 'function' ? v('Topic') : [].concat(v).join(' ')]);
+  for (const [where, text] of visible) {
+    for (const hit of scanClaims(text, { approvedTerms: SOMA_APPROVED_TERMS })) failures.push(`${where}: forbidden claim: ${hit.label} — "${hit.match}"`);
+  }
+  for (const e of somaEntries) {
+    if (e.draft) failures.push(`SOMA ${e.id}: still marked draft`);
+  }
+  const chunks = files.filter((f) => /soma-panel\.[^/\\]+\.js$/.test(f));
+  if (chunks.length !== 1) failures.push(`SOMA: expected one built notebook chunk, found ${chunks.length}`);
+  else {
+    const built = readFileSync(chunks[0], 'utf8');
+    // Compare the opening ASCII run of each answer: the build may escape the typographic apostrophes.
+    for (const e of somaEntries) {
+      const probe = e.answer[0].match(/^[\x20-\x7e]+/)[0].slice(0, 40);
+      if (!built.includes(probe)) failures.push(`SOMA ${e.id}: the built notebook does not contain the answer that was validated`);
+    }
+  }
+  console.log(`verify-dist: SOMA FAQ checked — ${somaEntries.length} entries, ${visible.length} visible strings, approved terms: ${SOMA_APPROVED_TERMS.map((t) => t.term).join(', ')}`);
 }
 
 /* 3 ─ Links and assets */
