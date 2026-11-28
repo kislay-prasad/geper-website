@@ -20,7 +20,7 @@ import notebookCss from './soma.css?inline';
 import { somaCopy, somaEntries, somaTopics, type SomaEntry, type SomaTopic } from '../../data/soma-faq.ts';
 import { site, pagePath } from '../../data/site.ts';
 import { findEntries } from './soma-search.ts';
-import { glyph, somaMarkImg } from './soma-mark.ts';
+import { glyph, somaMarkImg, themeHelix } from './soma-mark.ts';
 
 type Paper = 'light' | 'dark';
 
@@ -378,15 +378,16 @@ function build(launcher: HTMLButtonElement): Ui {
   brand.append(mark, names);
 
   const tools = el('div', 'soma-tools');
-  const tool = (label: string, svg: string) => {
-    const b = el('button', 'soma-tool');
+  const tool = (label: string, svg: string, extra = '') => {
+    const b = el('button', `soma-tool${extra}`);
     b.type = 'button';
     b.setAttribute('aria-label', label);
     b.title = label;
     b.append(icon(svg));
     return b;
   };
-  const themeBtn = tool('Switch to dark paper', glyph.paper);
+  // The website's own pixel-helix theme button, copied so the notebook and the page share one switch.
+  const themeBtn = tool('Switch to dark paper', themeHelix, ' soma-tool--theme');
   const minimiseBtn = tool('Minimise SOMA and keep my place', glyph.minimise);
   const closeBtn = tool('Close SOMA and clear the conversation', glyph.close);
   tools.append(themeBtn, minimiseBtn, closeBtn);

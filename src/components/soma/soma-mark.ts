@@ -19,11 +19,35 @@ export const somaMarkImg = (height: number) =>
 const svg = (inner: string, size: number, stroke = 1.9) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${inner}</svg>`;
 
+/* The light / dark switch glyph: the website's own pixel double helix (src/components/nav/ThemeToggle.astro),
+   built by the same arithmetic so it is the same twelve pixels in the same places. Each pixel carries its
+   light-state and dark-state position as CSS variables, and soma.css moves it between them when the paper
+   changes, so the switch reads as the helix advancing a quarter turn. */
+const HELIX_ROWS = 6;
+const HELIX_PX = 2;
+const HELIX_CX = 7;
+const HELIX_AMP = 4.2;
+const r2 = (n: number) => Math.round(n * 100) / 100;
+const HELIX_TONE: Record<number, string> = { 2: 'is-blue', 9: 'is-green' }; // blue = computation, green = biology
+export const themeHelix = (() => {
+  const rects: string[] = [];
+  for (let row = 0; row < HELIX_ROWS; row++) {
+    const phase = (row * Math.PI) / (HELIX_ROWS - 1);
+    [1, -1].forEach((dir, k) => {
+      const i = row * 2 + k;
+      const y = r2(0.6 + row * 2.76);
+      const xLight = r2(HELIX_CX + dir * HELIX_AMP * Math.cos(phase) - HELIX_PX / 2);
+      const xDark = r2(HELIX_CX + dir * HELIX_AMP * Math.cos(phase + Math.PI / 2) - HELIX_PX / 2);
+      const tone = HELIX_TONE[i] ? ` ${HELIX_TONE[i]}` : '';
+      rects.push(`<rect class="tt-px${tone}" width="${HELIX_PX}" height="${HELIX_PX}" rx="0.35" x="0" y="${y}" style="--xl:${xLight}px;--xd:${xDark}px;--d:${row * 26}ms"/>`);
+    });
+  }
+  return `<svg class="tt-helix" width="17" height="18" viewBox="0 0 14 17" fill="none" aria-hidden="true" focusable="false">${rects.join('')}</svg>`;
+})();
+
 const g = (inner: string, size = 18) => svg(inner, size, 1.8);
 
 export const glyph = {
-  /** Half-filled circle: paper tone. */
-  paper: g('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor" stroke="none"/>'),
   minimise: g('<path d="M5 18h14"/>'),
   close: g('<path d="M6 6l12 12M18 6 6 18"/>'),
   back: g('<path d="M9 7 4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 6 6"/>', 16),

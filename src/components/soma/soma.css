@@ -37,6 +37,8 @@
   --ink-2: #3b3a42;
   --ink-muted: #5c5b63;      /* a shade darker than the site's #5f5e66 so it stays AA over the grid on this ground */
   --accent: #1d4ed8;         /* markers, hairline segment, focus: the website's blue */
+  --sci-blue: #1677d2;        /* the website's figure palette, used by the theme button's two coloured pixels */
+  --sci-green: #2fae7a;
   --accent-ink: #17307d;     /* blue used for text: selectable entries and labels (AA on paper) */
   --hover: rgb(29 78 216 / 0.06);
   --focus: #1d4ed8;
@@ -53,6 +55,8 @@
   --ink-2: #c7c4bd;
   --ink-muted: #9a978f;
   --accent: #3b82f6;
+  --sci-blue: #4f9ff0;
+  --sci-green: #45cf95;
   --accent-ink: #9dbcff;
   --hover: rgb(157 188 255 / 0.08);
   --focus: #9dbcff;
@@ -179,6 +183,35 @@
   transition: background-color 120ms ease, color 120ms ease;
 }
 .soma-tool:hover { background: var(--hover); color: var(--ink); }
+
+/* The light / dark switch is the website's own button (ThemeToggle.astro): the same bordered square and the same
+   pixel double helix. Each pixel sits at its light-state x and slides to its dark-state x, row by row, so the
+   switch reads as the helix advancing rather than an icon being swapped. It follows the notebook's own paper. */
+.soma-tool--theme {
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--ink);
+  transition: border-color 150ms ease, color 150ms ease;
+}
+.soma-tool--theme:hover { background: none; border-color: var(--ink); color: var(--ink); }
+.soma-tool--theme .tt-helix { display: block; }
+.tt-px {
+  fill: var(--ink-2);
+  transform: translateX(var(--xl));
+  transition:
+    transform 380ms var(--ease-out-quart),
+    fill 260ms var(--ease-out-quart);
+  transition-delay: var(--d), 0ms;
+}
+.tt-px.is-blue { fill: var(--sci-blue); }
+.tt-px.is-green { fill: var(--sci-green); }
+.soma-panel[data-paper="dark"] .tt-px { transform: translateX(var(--xd)); fill: var(--ink); }
+.soma-panel[data-paper="dark"] .tt-px.is-blue { fill: var(--sci-blue); }
+.soma-panel[data-paper="dark"] .tt-px.is-green { fill: var(--sci-green); }
+.soma-tool--theme:hover .tt-px { fill: var(--ink); }
+.soma-tool--theme:hover .tt-px.is-blue { fill: var(--sci-blue); }
+.soma-tool--theme:hover .tt-px.is-green { fill: var(--sci-green); }
+@media (prefers-reduced-motion: reduce) { .tt-px { transition: none; } }
 
 /* ----------------------------------------------------------------- paper */
 
