@@ -29,13 +29,13 @@
   --content-left: calc(var(--cell) + var(--gutter));
 
   /* Light paper: white, with fine light-grey grid lines */
-  --paper: #fdfdfa;
+  --paper: #f6f3ec;          /* the website's own off-white */
   --grid: rgb(70 78 96 / 0.17);
   --line: rgb(38 37 44 / 0.2);
   --line-strong: rgb(38 37 44 / 0.42);
   --ink: #17161a;
   --ink-2: #3b3a42;
-  --ink-muted: #5f5e66;
+  --ink-muted: #5c5b63;      /* a shade darker than the site's #5f5e66 so it stays AA over the grid on this ground */
   --accent: #1d4ed8;         /* markers, hairline segment, focus: the website's blue */
   --accent-ink: #17307d;     /* blue used for text: selectable entries and labels (AA on paper) */
   --hover: rgb(29 78 216 / 0.06);
