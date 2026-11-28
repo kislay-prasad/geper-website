@@ -288,6 +288,62 @@ test('Turnstile: refusals never echo the secret, the token or internals', async 
   }
 });
 
+test('Turnstile: expired token (timeout-or-duplicate) → 403, nothing emailed', async () => {
+  const s = stub({ siteverify: verifyWith({ success: false, 'error-codes': ['timeout-or-duplicate'] }) });
+  await expectRefused(await handleContact(jsonRequest({ ...VALID, turnstileToken: 'tok-expired' }), env(TS), s.impl), 403, 'verification_failed', s);
+});
+
+test('Turnstile: verification request times out → 503, nothing emailed, and a timeout signal is attached', async () => {
+  const seen: AbortSignal[] = [];
+  const calls: string[] = [];
+  const impl = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    calls.push(String(input));
+    if (String(input).includes('siteverify')) {
+      if (init.signal) seen.push(init.signal);
+      throw new DOMException('The operation timed out.', 'TimeoutError');
+    }
+    return Response.json({ id: 'email-123' });
+  }) as typeof fetch;
+  const res = await handleContact(jsonRequest(VALID), env(TS), impl);
+  assert.equal(res.status, 503);
+  assert.deepEqual(await res.json(), { error: 'verification_unavailable' });
+  assert.equal(seen.length, 1);
+  assert.ok(seen[0] instanceof AbortSignal, 'siteverify must be called with an abort/timeout signal');
+  assert.ok(!calls.some((u) => u.includes('resend')), 'Resend must never be called');
+});
+
+test('Turnstile: siteverify is asked exactly once per submission, and Resend exactly once on success', async () => {
+  const ok = stub();
+  assert.equal((await handleContact(jsonRequest(VALID), env(TS), ok.impl)).status, 202);
+  assert.equal(ok.verifyCalls().length, 1);
+  assert.equal(ok.resendCalls().length, 1);
+  const bad = stub({ siteverify: verifyWith({ success: false }) });
+  await handleContact(jsonRequest(VALID), env(TS), bad.impl);
+  assert.equal(bad.verifyCalls().length, 1, 'a refusal is not retried');
+  assert.equal(bad.resendCalls().length, 0);
+});
+
+test('Turnstile: the token, the secret and the Resend key are never written to the logs', async () => {
+  const logged: string[] = [];
+  const keep = { log: console.log, warn: console.warn, error: console.error, info: console.info };
+  const grab = (...a: unknown[]) => { logged.push(a.map(String).join(' ')); };
+  console.log = console.warn = console.error = console.info = grab;
+  try {
+    const token = 'tok-SECRET-VALUE-123';
+    await handleContact(jsonRequest({ ...VALID, turnstileToken: token }), env(TS), stub({ siteverify: verifyWith({ success: false, 'error-codes': ['invalid-input-response'] }) }).impl);
+    await handleContact(jsonRequest({ ...VALID, turnstileToken: token }), env(TS), stub({ siteverify: verifyWith({ ...GOOD, action: 'login' }) }).impl);
+    await handleContact(jsonRequest({ ...VALID, turnstileToken: token }), env(TS), stub({ siteverify: verifyWith({ ...GOOD, hostname: 'evil.example' }) }).impl);
+    await handleContact(jsonRequest({ ...VALID, turnstileToken: token }), env(TS), stub({ throwOn: 'siteverify' }).impl);
+    await handleContact(jsonRequest({ ...VALID, turnstileToken: token }), env(TS), stub({ siteverify: verifyWith(GOOD, 500) }).impl);
+    await handleContact(jsonRequest({ ...VALID, turnstileToken: token }), env({ TURNSTILE_SECRET_KEY: '' }), stub().impl);
+  } finally {
+    Object.assign(console, keep);
+  }
+  assert.ok(logged.length > 0, 'refusals are logged (without secrets)');
+  const all = logged.join('\n');
+  for (const secret of ['tok-SECRET-VALUE-123', 'ts-secret', 're_test']) assert.ok(!all.includes(secret), `log leaked ${secret}`);
+});
+
 test('Turnstile: validation errors still come first, and the message is never sent on a refusal', async () => {
   const s = stub({ siteverify: verifyWith({ success: false }) });
   const bad = await handleContact(jsonRequest({ ...VALID, email: 'not-an-email' }), env(TS), s.impl);
