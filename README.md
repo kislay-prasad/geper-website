@@ -56,7 +56,7 @@ All pages are served as static assets from `dist/` (see `wrangler.jsonc`); only 
 exception is answered with JSON `500 {"error":"internal_error"}` and logged (Workers Logs is enabled in `wrangler.jsonc`).
 
 Server-side env vars (Worker → Settings → Variables and Secrets, or `wrangler secret put NAME`; locally `.dev.vars`):
-`RESEND_API_KEY` (secret, required), `TURNSTILE_SECRET_KEY` (secret; when set, every submission must carry a valid token),
+`RESEND_API_KEY` (secret, required), `TURNSTILE_SECRET_KEY` (secret, required: verification fails closed, so without it every submission is refused with 503 and nothing is emailed),
 `CONTACT_TO` (default `contact@geper.in`), `CONTACT_FROM` (default `GEPER Website <onboarding@resend.dev>`; production is
 configured as `GEPER Website <website@notify.geper.in>` in `wrangler.jsonc`), `ALLOWED_ORIGINS` (optional).
 The Resend key must be allowed to send from `notify.geper.in`.
@@ -74,7 +74,7 @@ TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 TURNSTILE_VERIFY_URL=http://127.0.0.1:8799/siteverify
 ```
 
-(`1x00…AA` are Cloudflare's always-pass Turnstile test keys.) Never set `RESEND_API_URL` or `TURNSTILE_VERIFY_URL` in production.
+A submission is only accepted when Cloudflare confirms the token with `success: true`, `action: "contact"` and a `hostname` matching the site (the request host, plus any `ALLOWED_ORIGINS` hosts). A missing or invalid token, a siteverify outage or error, or any mismatch refuses it. (`1x00…AA` are Cloudflare's always-pass Turnstile test keys.) Never set `RESEND_API_URL` or `TURNSTILE_VERIFY_URL` in production.
 
 Deploy: Workers Builds (Git) with build command `npm run build` and deploy command `npx wrangler deploy`, or `npm run deploy`.
 The Worker name in `wrangler.jsonc` (`geper-website`) must match the Worker in the dashboard. After a deploy, `npm run smoke`.
